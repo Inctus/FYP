@@ -1,3 +1,4 @@
 [submodule "agt"]
 	path = agt
 	url = https://github.com/psosnin/AbstractGradientTrainingPrivate.git
+	ignore = dirty
