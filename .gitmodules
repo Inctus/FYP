@@ -2,3 +2,6 @@
 	path = agt
 	url = https://github.com/psosnin/AbstractGradientTrainingPrivate.git
 	ignore = dirty
+[submodule "fair_fairness_benchmark"]
+	path = fair_fairness_benchmark
+	url = https://github.com/ahxt/fair_fairness_benchmark/
