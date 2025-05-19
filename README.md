@@ -25,5 +25,6 @@ A codebase accompanying the Master's thesis on evaluating fairness across differ
    ```bash
    pip install -r requirements.txt
    ```
-3. Run experiments:
+3. Install datasets. For AIF360 fairness datasets, see specific instructions in their corresponding READMEs in the AIF360 source.
+4. Run experiments:
    TODO
