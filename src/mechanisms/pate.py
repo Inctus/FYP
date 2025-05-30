@@ -1,8 +1,10 @@
 from typing import Tuple
 
+from datasets import BaseDataset
 from mechanism import BaseMechanism
+from util.privacy import PrivacyBudget
 
-class PateMechanism(BaseMechanism):
+class PATEMechanism(BaseMechanism):
     """
     PATE (Private Aggregation of Teacher Ensembles) mechanism for differential privacy.
     This is a pared down version of the original PATE mechanism, focussing on the private prediction setting.
@@ -10,11 +12,14 @@ class PateMechanism(BaseMechanism):
     There is no student model, since we want to just produce DP predictions from the teacher models.
     """
 
-    def __init__(self):
-        super().__init__()
-        print("PATE mechanism initialized.")
-    
-    def train(self, dataset, privacy_budget: Tuple[float, float], **kwargs):
-        # Use TensorFlow to implement the PATE mechanism
+    def __init__(self, model_constructor, dataset: BaseDataset, privacy_budget: PrivacyBudget, n: int):
+        super().__init__(model_constructor, dataset, privacy_budget)
+        self.n = n
 
-        pass
+        print(f"PATE Mechanism initialized with n={self.n} and privacy budget: {self.privacy_budget}")
+
+    def train(self, **kwargs):
+        raise NotImplementedError("PATE training not yet implemented.")
+
+    def predict(self):
+        raise NotImplementedError("PATE prediction not yet implemented.")

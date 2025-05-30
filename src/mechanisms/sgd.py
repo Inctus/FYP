@@ -18,9 +18,20 @@ class SGDMechanism(BaseMechanism):
     
     def __init__(self, model_constructor, dataset: BaseDataset, privacy_budget: PrivacyBudget):
         super().__init__(model_constructor, dataset, privacy_budget)
-        print("Initialized SGDMechanism for training models with fairness considerations")
+        print("Initialized SGDMechanism")
     
     def train(self, **kwargs) -> TrainingResults:
+        """
+        Trains the model using Stochastic Gradient Descent (SGD).
+        Args:
+            **kwargs: Additional hyperparameters for training.
+                - num_epochs (int): Number of training epochs.
+                - learning_rate (float): Learning rate for the optimizer.
+                - batch_size (int): Size of each training batch.
+                - patience (int): Early stopping patience.
+        Returns:
+            TrainingResults: Contains AUROC score, accuracy, mechanism name, and hyperparameters.
+        """
         # Instantiate model and get dataset
         model = self.model_constructor()
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -28,7 +39,7 @@ class SGDMechanism(BaseMechanism):
         print(f"Training on device: {device}")
         
         # Access dataset and ignore stored privacy budget
-        train_dataset, val_dataset, test_dataset = self.dataset.to_torch(include_protected=False)
+        train_dataset, val_dataset, _ = self.dataset.to_torch(include_protected=False)
         
         # Extract hyperparameters with sensible defaults
         num_epochs = kwargs.get('num_epochs', 100)
@@ -49,7 +60,7 @@ class SGDMechanism(BaseMechanism):
         print(f"Dataset splits:")
         print(f"  Training samples: {len(train_dataset)}")
         print(f"  Validation samples: {len(val_dataset)}")
-        print(f"  Test samples: {len(test_dataset)}")
+        print(f"  Test samples: {len(_)}")
         
         # Set up optimizer and loss function
         optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
@@ -159,30 +170,30 @@ class SGDMechanism(BaseMechanism):
             model.load_state_dict(best_model_state)
             print("Restored best model weights from validation phase")
         
-            # Evaluate on test set
+            # Evaluate on validation set
             model.eval()
-            test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-            test_total, test_correct = 0, 0
+            val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+            val_total, val_correct = 0, 0
             all_outputs, all_labels = [], []
             with torch.no_grad():
-                for batch_X, batch_y in test_loader:
+                for batch_X, batch_y in val_loader:
                     batch_X, batch_y = batch_X.to(device), batch_y.to(device)
                     batch_y = batch_y.view(-1, 1)
                     _, outputs = model(batch_X)
                     preds = (outputs > 0.5).float()
-                    test_correct += (preds == batch_y).sum().item()
-                    test_total += batch_y.size(0)
+                    val_correct += (preds == batch_y).sum().item()
+                    val_total += batch_y.size(0)
                     all_outputs.extend(outputs.squeeze().cpu().numpy().tolist())
                     all_labels.extend(batch_y.squeeze().cpu().numpy().tolist())
-            test_accuracy = test_correct / test_total
-            test_auroc = roc_auc_score(all_labels, all_outputs)
-            
+            val_accuracy = val_correct / val_total
+            val_auroc = roc_auc_score(all_labels, all_outputs)
+    
             # Save trained model
             self.model = model
             # Return structured training results
             return TrainingResults(
-                auroc_score=test_auroc,
-                accuracy=test_accuracy,
+                auroc_score=val_auroc,
+                accuracy=val_accuracy,
                 mechanism_name="SGD",
                 hyperparameters={
                     'num_epochs': num_epochs,

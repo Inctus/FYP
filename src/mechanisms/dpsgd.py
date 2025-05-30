@@ -24,9 +24,22 @@ class DPSGDMechanism(BaseMechanism):
     
     def __init__(self, model_constructor, dataset: BaseDataset, privacy_budget: PrivacyBudget):
         super().__init__(model_constructor, dataset, privacy_budget)
-        print("Initialized DPSGDMechanism using Opacus for privacy-preserving training")
+        print(f"DPSGD Mechanism initialized with privacy budget: ε={privacy_budget.epsilon}, δ={privacy_budget.delta}")
     
     def train(self, **kwargs) -> TrainingResults:
+        """
+        Trains the model using DP-SGD.
+
+        Args:
+            **kwargs: Additional hyperparameters for training, such as:
+                - num_epochs (int): Number of training epochs.
+                - learning_rate (float): Learning rate for the optimizer.
+                - batch_size (int): Size of each training batch.
+                - max_grad_norm (float): Maximum gradient norm for clipping.
+                - patience (int): Early stopping patience.
+        Returns:
+            TrainingResults: A structured object containing training metrics and hyperparameters.
+        """
         # Instantiate model and set device
         model = self.model_constructor()
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -38,7 +51,7 @@ class DPSGDMechanism(BaseMechanism):
         print(f"Target privacy budget: ε={epsilon}, δ={delta}")
         
         # Load datasets
-        train_dataset, val_dataset, test_dataset = self.dataset.to_torch(include_protected=False)
+        train_dataset, val_dataset, _ = self.dataset.to_torch(include_protected=False)
         
         # Validate privacy parameters
         if epsilon <= 0 or delta <= 0 or delta >= 1:
@@ -51,7 +64,6 @@ class DPSGDMechanism(BaseMechanism):
         
         # DP-specific hyperparameters
         max_grad_norm = kwargs.get('max_grad_norm', 1.0)  # Gradient clipping threshold
-        noise_multiplier = kwargs.get('noise_multiplier', None)  # Will be auto-computed if None
         patience = kwargs.get('patience', 20)  # Reduced for DP training
         
         print(f"Training configuration:")
@@ -73,7 +85,7 @@ class DPSGDMechanism(BaseMechanism):
         print(f"Dataset splits:")
         print(f"  Training samples: {len(train_dataset)}")
         print(f"  Validation samples: {len(val_dataset)}")
-        print(f"  Test samples: {len(test_dataset)}")
+        print(f"  Test samples: {len(_)}")
         print(f"  Training batches: {len(train_loader)}")
         
         # Validate model compatibility with Opacus
@@ -146,7 +158,7 @@ class DPSGDMechanism(BaseMechanism):
                     optimizer.zero_grad()
                     
                     # Forward pass - handle dual output from MLP
-                    hidden_repr, outputs = model(batch_X)
+                    logits, outputs = model(batch_X)
                     
                     # Compute per-sample losses (no reduction)
                     per_sample_losses = criterion(outputs, batch_y)
@@ -177,8 +189,8 @@ class DPSGDMechanism(BaseMechanism):
                     batch_y = batch_y.view(-1, 1).float()
                     
                     # Forward pass
-                    hidden_repr, outputs = model(batch_X)
-                    
+                    logits, outputs = model(batch_X)
+
                     # For validation, we can use standard loss reduction
                     val_criterion = nn.BCELoss()
                     loss = val_criterion(outputs, batch_y)
@@ -242,30 +254,30 @@ class DPSGDMechanism(BaseMechanism):
         print(f"Final privacy expenditure: ε={final_epsilon:.4f}, δ={delta}")
         print(f"Privacy budget utilization: {(final_epsilon/epsilon)*100:.1f}%")
         
-        # Evaluate on test set
+        # Evaluate on validation set
         model.eval()
-        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-        test_total, test_correct = 0, 0
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+        val_total, val_correct = 0, 0
         all_outputs, all_labels = [], []
         with torch.no_grad():
-            for batch_X, batch_y in test_loader:
+            for batch_X, batch_y in val_loader:
                 batch_X, batch_y = batch_X.to(device), batch_y.to(device)
                 batch_y = batch_y.view(-1, 1).float()
                 _, outputs = model(batch_X)
                 preds = (outputs > 0.5).float()
-                test_correct += (preds == batch_y).sum().item()
-                test_total += batch_y.size(0)
+                val_correct += (preds == batch_y).sum().item()
+                val_total += batch_y.size(0)
                 all_outputs.extend(outputs.squeeze().cpu().numpy().tolist())
                 all_labels.extend(batch_y.squeeze().cpu().numpy().tolist())
-        test_accuracy = test_correct / test_total
-        test_auroc = roc_auc_score(all_labels, all_outputs)
+        val_accuracy = val_correct / val_total
+        val_auroc = roc_auc_score(all_labels, all_outputs)
 
         # Save trained model
         self.model = model
         # Return structured training results
         return TrainingResults(
-            auroc_score=test_auroc,
-            accuracy=test_accuracy,
+            auroc_score=val_auroc,
+            accuracy=val_accuracy,
             mechanism_name="DPSGD",
             hyperparameters={
                 'num_epochs': num_epochs,
