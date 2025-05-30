@@ -266,7 +266,7 @@ class DPSGDMechanism(BaseMechanism):
         return TrainingResults(
             auroc_score=test_auroc,
             accuracy=test_accuracy,
-            mechanism_name=self.__class__.__name__,
+            mechanism_name="DPSGD",
             hyperparameters={
                 'num_epochs': num_epochs,
                 'learning_rate': learning_rate,
