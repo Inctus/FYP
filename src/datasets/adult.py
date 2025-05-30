@@ -1,8 +1,6 @@
 from aif360.datasets import AdultDataset as Aif360AdultDataset
-import torch.nn as nn
 
 from datasets.dataset import BaseDataset
-from util.networks import MLP
 
 ADULT_DATA_FEATURES = 102
 
