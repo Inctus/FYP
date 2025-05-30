@@ -1,4 +1,4 @@
-from util.constants import RANDOM_SEED
+from util.constants import RANDOM_SEED, TRAIN_SPLIT, VAL_SPLIT, TEST_SPLIT
 
 import torch
 from torch.utils.data import Dataset as TorchDataset
@@ -83,10 +83,14 @@ class BaseDataset(ABC):
         
         # Calculate split sizes
         total_size = len(converted_dataset)
-        train_size = int(0.7 * total_size)
-        val_size = int(0.15 * total_size)
+        train_size = int(TRAIN_SPLIT * total_size)
+        val_size = int(VAL_SPLIT * total_size)
         test_size = total_size - train_size - val_size
-        
+        # Ensure the splits sum to total size
+        assert train_size + val_size + test_size == total_size, \
+            "Train, validation, and test splits must sum to the total dataset size"
+        # Log the sizes for debugging
+        print(f"Dataset sizes - Train: {train_size}, Val: {val_size}, Test: {test_size}")
         # Perform the split with fixed random seed for reproducibility
         train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(
             converted_dataset,
