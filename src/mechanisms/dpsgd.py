@@ -76,21 +76,20 @@ class DPSGDMechanism(BaseMechanism):
         print(f"  Max gradient norm (clipping): {config['max_grad_norm']}")
         print(f"  Early stopping patience: {config['patience']}")
     
-    def _setup_data_loaders(self, config):
+    def _setup_data_loaders(self, hyperparameters: DPSGDHyperparameters):
         """Create data loaders with DP-specific requirements."""
         train_dataset, val_dataset, test_dataset = self.dataset.to_torch(include_protected=False)
         
         # DP requires drop_last=True for consistent batch sizes, it drops the final incomplete batch
-        # i.e. [[1, 2, 3], [4, 5, 6], [7, 8]] -> [[1, 2, 3], [4, 5, 6]] 
-        #                              ^^^^
+        # i.e. [[1, 2, 3], [4, 5, 6], [7, 8]] -> [[1, 2, 3], [4, 5, 6]]
         train_loader = DataLoader(
             train_dataset, 
-            batch_size=config['batch_size'], 
+            batch_size=hyperparameters.batch_size, 
             shuffle=True,
             drop_last=True
         )
-        val_loader = DataLoader(val_dataset, batch_size=config['batch_size'], shuffle=False)
-        
+        val_loader = DataLoader(val_dataset, batch_size=hyperparameters.batch_size, shuffle=False)
+
         self._log_dataset_info(train_dataset, val_dataset, test_dataset, train_loader)
         
         return train_loader, val_loader
@@ -119,7 +118,7 @@ class DPSGDMechanism(BaseMechanism):
         criterion = nn.BCELoss(reduction='none')  # No reduction for per-sample losses
         return optimizer, criterion
     
-    def _setup_privacy_engine(self, model, optimizer, train_loader, config, epsilon, delta):
+    def _setup_privacy_engine(self, model, optimizer, train_loader, hyperparameters: DPSGDHyperparameters, epsilon, delta):
         """Initialize and configure the privacy engine."""
         privacy_engine = PrivacyEngine()
         
@@ -128,10 +127,10 @@ class DPSGDMechanism(BaseMechanism):
             module=model,
             optimizer=optimizer,
             data_loader=train_loader,
-            epochs=config['num_epochs'],
+            epochs=hyperparameters.n_epochs,
             target_epsilon=epsilon,
             target_delta=delta,
-            max_grad_norm=config['max_grad_norm'],
+            max_grad_norm=hyperparameters.max_grad_norm,
         )
         
         self._log_privacy_setup(privacy_engine, optimizer)
@@ -142,12 +141,6 @@ class DPSGDMechanism(BaseMechanism):
         """Log privacy engine configuration."""
         print(f"Opacus computed noise multiplier: {optimizer.noise_multiplier:.4f}")
         print(f"Privacy accountant: {privacy_engine.accountant.__class__.__name__}")
-    
-    def _process_batch_dp(self, batch_X, batch_y, device):
-        """Process batch for DP training with proper tensor formatting."""
-        batch_X, batch_y = batch_X.to(device), batch_y.to(device)
-        batch_y = batch_y.view(-1, 1).float()
-        return batch_X, batch_y
     
     def _train_epoch_dp(self, model, train_loader, optimizer, criterion, device, batch_size):
         """Execute one DP training epoch."""
@@ -164,7 +157,8 @@ class DPSGDMechanism(BaseMechanism):
         ) as memory_safe_data_loader:
             
             for batch_X, batch_y in memory_safe_data_loader:
-                batch_X, batch_y = self._process_batch_dp(batch_X, batch_y, device)
+                batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+                batch_y = batch_y.view(-1, 1).float()
                 
                 optimizer.zero_grad()
                 
@@ -199,7 +193,8 @@ class DPSGDMechanism(BaseMechanism):
         
         with torch.no_grad():
             for batch_X, batch_y in val_loader:
-                batch_X, batch_y = self._process_batch_dp(batch_X, batch_y, device)
+                batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+                batch_y = batch_y.view(-1, 1).float()
                 
                 logits, outputs = model(batch_X)
                 loss = val_criterion(outputs, batch_y)
@@ -257,7 +252,8 @@ class DPSGDMechanism(BaseMechanism):
         
         with torch.no_grad():
             for batch_X, batch_y in val_loader:
-                batch_X, batch_y = self._process_batch_dp(batch_X, batch_y, device)
+                batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+                batch_y = batch_y.view(-1, 1).float()
                 
                 _, outputs = model(batch_X)
                 predicted = (outputs > 0.5).float()
@@ -271,31 +267,26 @@ class DPSGDMechanism(BaseMechanism):
         val_accuracy = val_correct / val_total
         val_auroc = roc_auc_score(all_labels, all_outputs)
         return val_auroc, val_accuracy
-    
-    def train(self, **kwargs) -> TrainingResults:
+
+    def train(self, hyperparameters: DPSGDHyperparameters) -> TrainingResults:
         """
         Trains the model using DP-SGD.
 
         Args:
-            **kwargs: Additional hyperparameters for training, such as:
-                - num_epochs (int): Number of training epochs.
-                - learning_rate (float): Learning rate for the optimizer.
-                - batch_size (int): Size of each training batch.
-                - max_grad_norm (float): Maximum gradient norm for clipping.
-                - patience (int): Early stopping patience.
+            hyperparameters (DPSGDHyperparameters): Hyperparameters for training.
         Returns:
             TrainingResults: A structured object containing training metrics and hyperparameters.
         """
         # Setup phase
         model, device = self._setup_model_and_device()
-        config, epsilon, delta = self._extract_hyperparameters(**kwargs)
-        train_loader, val_loader = self._setup_data_loaders(config)
+        epsilon, delta = self.privacy_budget.epsilon, self.privacy_budget.delta
+        train_loader, val_loader = self._setup_data_loaders(hyperparameters)
         
         # Model validation and DP setup
         model = self._validate_model_for_opacus(model)
-        optimizer, criterion = self._setup_optimizer_and_criterion(model, config['learning_rate'])
+        optimizer, criterion = self._setup_optimizer_and_criterion(model, hyperparameters.learning_rate)
         privacy_engine, model, optimizer, train_loader = self._setup_privacy_engine(
-            model, optimizer, train_loader, config, epsilon, delta
+            model, optimizer, train_loader, hyperparameters, epsilon, delta
         )
         
         # Training tracking variables
@@ -314,10 +305,10 @@ class DPSGDMechanism(BaseMechanism):
         print("Note: DP training is typically slower due to per-sample gradient computation")
         
         # Training loop
-        for epoch in range(config['num_epochs']):
+        for epoch in range(hyperparameters.n_epochs):
             # Train and validate
             train_loss, train_acc = self._train_epoch_dp(
-                model, train_loader, optimizer, criterion, device, config['batch_size']
+                model, train_loader, optimizer, criterion, device, hyperparameters.batch_size
             )
             val_loss, val_acc = self._validate_epoch_dp(model, val_loader, device)
             
@@ -332,8 +323,8 @@ class DPSGDMechanism(BaseMechanism):
             privacy_spent.append(current_epsilon)
             
             # Log progress
-            self._log_epoch_progress_dp(epoch, config['num_epochs'], train_loss, train_acc, 
-                                       val_loss, val_acc, current_epsilon)
+            self._log_epoch_progress_dp(epoch, hyperparameters.n_epochs, train_loss, train_acc, 
+                                        val_loss, val_acc, current_epsilon)
             
             # Check privacy budget
             if self._check_privacy_budget_exhausted(current_epsilon, epsilon):
@@ -346,8 +337,8 @@ class DPSGDMechanism(BaseMechanism):
             
             if new_best_state is not None:
                 best_model_state = new_best_state
-            
-            if patience_counter >= config['patience']:
+
+            if patience_counter >= hyperparameters.patience:
                 print(f'Early stopping triggered after {epoch + 1} epochs')
                 print(f'Best validation loss: {best_val_loss:.4f}')
                 break
@@ -361,8 +352,8 @@ class DPSGDMechanism(BaseMechanism):
         
         # Final evaluation
         _, val_dataset, _ = self.dataset.to_torch(include_protected=False)
-        val_auroc, val_accuracy = self._evaluate_final_model_dp(model, val_dataset, device, config['batch_size'])
-        
+        val_auroc, val_accuracy = self._evaluate_final_model_dp(model, val_dataset, device, hyperparameters.batch_size)
+
         # Save trained model
         self.model = model
         
@@ -370,10 +361,7 @@ class DPSGDMechanism(BaseMechanism):
             auroc_score=val_auroc,
             accuracy=val_accuracy,
             mechanism_name="DPSGD",
-            hyperparameters={
-                **config,
-                'noise_multiplier': optimizer.noise_multiplier
-            }
+            hyperparameters=hyperparameters
         )
 
     def predict(self):

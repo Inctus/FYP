@@ -136,7 +136,8 @@ class SGDMechanism(BaseMechanism):
         
         with torch.no_grad():
             for batch_X, batch_y in val_loader:
-                batch_X, batch_y = self._process_batch(batch_X, batch_y, model, device)
+                batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+                batch_y = batch_y.view(-1, 1)
                 
                 _, outputs = model(batch_X)
                 predicted = (outputs > 0.5).float()
