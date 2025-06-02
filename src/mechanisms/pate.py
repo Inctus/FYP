@@ -1,8 +1,10 @@
 from typing import Tuple
 
-from datasets import BaseDataset
 from mechanism import BaseMechanism
+
+from datasets import BaseDataset
 from util.privacy import PrivacyBudget
+
 
 class PATEMechanism(BaseMechanism):
     """

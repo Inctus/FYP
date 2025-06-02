@@ -6,8 +6,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from datasets import BaseDataset
-from util.reproducibility import make_reproducible
 from util.privacy import PrivacyBudget
+from util.reproducibility import make_reproducible
+
 
 @dataclass
 class TrainingResults:
@@ -28,6 +29,23 @@ class TrainingResults:
     hyperparameters: dict
 
 
+@dataclass
+class BaseHyperparameters:
+    """
+    Represents the hyperparameters used for training a mechanism.
+
+    Attributes:
+        learning_rate (float): The learning rate for the optimizer.
+        n_epochs (int): The number of epochs to train the mechanism.
+        batch_size (int): The size of the batches used during training.
+        patience (int): The number of epochs with no improvement after which training will be stopped.
+    """
+    learning_rate: float
+    n_epochs: int
+    batch_size: int
+    patience: int
+
+
 class BaseMechanism(ABC):
     """
     A base class for mechanisms that train models with differential privacy.
@@ -45,14 +63,14 @@ class BaseMechanism(ABC):
         self.privacy_budget = privacy_budget
 
     @abstractmethod
-    def train(self, **kwargs) -> TrainingResults:
+    def train(self, hyperparameters: BaseHyperparameters) -> TrainingResults:
         """
         Train the mechanism on the dataset with the given privacy budget.
         This modifies the internal state of the class to include the trained model.
         The trained model is not returned directly, but we expose functionality using the "predict" method.
 
         Args:
-            **kwargs: Hyperparameters for the training process.
+            hyperparameters (BaseHyperparameters): Hyperparameters for the training process.
 
         Returns:
             The results of the training process.

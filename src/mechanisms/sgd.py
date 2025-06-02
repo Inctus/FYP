@@ -1,11 +1,11 @@
-from mechanism import BaseMechanism, TrainingResults
-from datasets import BaseDataset
-
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
-from util.privacy import PrivacyBudget
+from mechanism import BaseHyperparameters, BaseMechanism, TrainingResults
 from sklearn.metrics import roc_auc_score
+from torch.utils.data import DataLoader
+
+from datasets import BaseDataset
+from util.privacy import PrivacyBudget
 
 
 class SGDMechanism(BaseMechanism):
@@ -19,8 +19,8 @@ class SGDMechanism(BaseMechanism):
     def __init__(self, model_constructor, dataset: BaseDataset, privacy_budget: PrivacyBudget):
         super().__init__(model_constructor, dataset, privacy_budget)
         print("Initialized SGDMechanism")
-    
-    def _setup_training(self, **kwargs):
+
+    def _setup_training(self, hyperparameters: BaseHyperparameters):
         """Setup model, device, data loaders, and hyperparameters."""
         # Model and device setup
         model = self.model_constructor()

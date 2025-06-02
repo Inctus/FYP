@@ -1,17 +1,15 @@
-from mechanism import BaseMechanism, TrainingResults
-from datasets import BaseDataset
-
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
-
+from mechanism import BaseMechanism, TrainingResults
 # Opacus imports for differential privacy
 from opacus import PrivacyEngine
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
-
-from util.privacy import PrivacyBudget
 from sklearn.metrics import roc_auc_score
+from torch.utils.data import DataLoader
+
+from datasets import BaseDataset
+from util.privacy import PrivacyBudget
 
 
 class DPSGDMechanism(BaseMechanism):
@@ -64,7 +62,9 @@ class DPSGDMechanism(BaseMechanism):
         """Create data loaders with DP-specific requirements."""
         train_dataset, val_dataset, test_dataset = self.dataset.to_torch(include_protected=False)
         
-        # DP requires drop_last=True for consistent batch sizes
+        # DP requires drop_last=True for consistent batch sizes, it drops the final incomplete batch
+        # i.e. [[1, 2, 3], [4, 5, 6], [7, 8]] -> [[1, 2, 3], [4, 5, 6]] 
+        #                              ^^^^
         train_loader = DataLoader(
             train_dataset, 
             batch_size=config['batch_size'], 

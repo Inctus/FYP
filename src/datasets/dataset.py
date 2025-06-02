@@ -1,9 +1,9 @@
-from util.constants import RANDOM_SEED, TRAIN_SPLIT, VAL_SPLIT, TEST_SPLIT
+from abc import ABC, abstractmethod
 
 import torch
 from torch.utils.data import Dataset as TorchDataset
 
-from abc import ABC, abstractmethod
+from util.constants import RANDOM_SEED, TEST_SPLIT, TRAIN_SPLIT, VAL_SPLIT
 
 
 class AIF360TorchDataset(TorchDataset):
