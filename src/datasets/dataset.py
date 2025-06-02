@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Tuple
 
 import torch
 from torch.utils.data import Dataset as TorchDataset
@@ -69,7 +70,7 @@ class BaseDataset(ABC):
         """
         raise NotImplementedError("load_data() must be implemented in subclasses")
     
-    def to_torch(self, include_protected=True):
+    def to_torch(self, include_protected=True) -> Tuple[TorchDataset, TorchDataset, TorchDataset]:
         """
         Converts the AIF360 dataset to PyTorch Datasets with train/val/test splits.
         
