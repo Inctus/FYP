@@ -5,6 +5,8 @@ A mechanism should take an untrained model, a dataset, privacy budget and (a set
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+import optuna
+
 from datasets import BaseDataset
 from util.privacy import PrivacyBudget
 from util.reproducibility import make_reproducible
@@ -88,5 +90,38 @@ class BaseMechanism(ABC):
 
         Returns:
             The predictions made by the trained model.
+        """
+        pass
+
+    @abstractmethod
+    def save(self, path: str):
+        """
+        Save the trained model to a file.
+
+        Args:
+            path (str): The path where the model should be saved.
+        """
+        pass
+
+    @abstractmethod
+    def load(self, path: str):
+        """
+        Load a trained model from a file.
+
+        Args:
+            path (str): The path from which the model should be loaded.
+        """
+        pass
+
+    @abstractmethod
+    def suggest_hyperparameters(self, trail: optuna.Trial) -> BaseHyperparameters:
+        """
+        Suggest hyperparameters for the mechanism based on the given trial.
+
+        Args:
+            trial (optuna.Trial): The trial object from Optuna.
+
+        Returns:
+            BaseHyperparameters: Suggested hyperparameters for the mechanism.
         """
         pass

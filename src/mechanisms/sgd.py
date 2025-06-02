@@ -1,3 +1,6 @@
+from dataclasses import asdict
+
+import optuna
 import torch
 import torch.nn as nn
 from mechanism import BaseHyperparameters, BaseMechanism, TrainingResults
@@ -6,8 +9,6 @@ from torch.utils.data import DataLoader
 
 from datasets import BaseDataset
 from util.privacy import PrivacyBudget
-
-from dataclasses import asdict
 
 
 class SGDMechanism(BaseMechanism):
@@ -249,3 +250,46 @@ class SGDMechanism(BaseMechanism):
                 predictions.extend(outputs.squeeze().cpu().numpy().tolist())
         
         return predictions
+
+    def save(self, path: str):
+        """
+        Save the trained model to a file.
+        
+        Args:
+            path (str): The file path where the model will be saved.
+        """
+        torch.save(self.model.state_dict(), path)
+        print(f"Model saved to {path}")
+    
+    def load(self, path: str):
+        """
+        Load a trained model from a file.
+        
+        Args:
+            path (str): The file path from which the model will be loaded.
+        """
+        self.model.load_state_dict(torch.load(path))
+        self.model.eval()
+        print(f"Model loaded from {path}")
+    
+    def suggest_hyperparameters(self, trial: optuna.Trial) -> BaseHyperparameters:
+        """
+        Suggest hyperparameters for the mechanism based on the given trial.
+        
+        Args:
+            trial (optuna.Trial): The Optuna trial object for hyperparameter optimization.
+        
+        Returns:
+            BaseHyperparameters: Suggested hyperparameters for training.
+        """
+        n_epochs = trial.suggest_int("n_epochs", 10, 100)
+        learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
+        batch_size = trial.suggest_categorical("batch_size", [16, 32, 64])
+        patience = trial.suggest_int("patience", 5, 20)
+        
+        return BaseHyperparameters(
+            n_epochs=n_epochs,
+            learning_rate=learning_rate,
+            batch_size=batch_size,
+            patience=patience
+        )

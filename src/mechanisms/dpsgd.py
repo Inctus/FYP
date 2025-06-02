@@ -1,6 +1,9 @@
+from dataclasses import dataclass
+
+import optuna
 import torch
 import torch.nn as nn
-from mechanism import BaseMechanism, TrainingResults, BaseHyperparameters
+from mechanism import BaseHyperparameters, BaseMechanism, TrainingResults
 # Opacus imports for differential privacy
 from opacus import PrivacyEngine
 from opacus.utils.batch_memory_manager import BatchMemoryManager
@@ -10,8 +13,6 @@ from torch.utils.data import DataLoader
 
 from datasets import BaseDataset
 from util.privacy import PrivacyBudget
-
-from dataclasses import dataclass
 
 
 @dataclass
@@ -384,3 +385,33 @@ class DPSGDMechanism(BaseMechanism):
                 predictions.extend(outputs.squeeze().cpu().numpy().tolist())
         
         return predictions
+    
+    def save(self, path: str):
+        """
+        Save the trained model to a file.
+        
+        Args:
+            path (str): The file path where the model should be saved.
+        """
+        torch.save(self.model.state_dict(), path)
+        print(f"Model saved to {path}")
+
+    def load(self, path):
+        """
+        Load a trained model from a file.
+        
+        Args:
+            path (str): The file path from which to load the model.
+        """
+        self.model.load_state_dict(torch.load(path))
+        self.model.eval()
+        print(f"Model loaded from {path}")
+
+    def suggest_hyperparameters(self, trial: optuna.Trial):
+        """
+        Suggest hyperparameters for the model training.
+        
+        Args:
+            trial (optuna.Trial): The Optuna trial object used for hyperparameter optimization.
+        """
+        raise NotImplementedError("DPSGD hyperparameter suggestion not yet implemented.")
