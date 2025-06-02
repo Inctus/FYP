@@ -20,7 +20,7 @@ class DPSGDHyperparameters(BaseHyperparameters):
     Hyperparameters for the DPSGD mechanism.
     These hyperparameters are tailored for differential privacy training using Opacus.
     Inherited Attributes:
-        num_epochs (int): Number of training epochs.
+        n_epochs (int): Number of training epochs.
         learning_rate (float): Learning rate for the optimizer.
         batch_size (int): Size of each training batch.
         patience (int): Number of epochs with no improvement before early stopping.

@@ -39,7 +39,7 @@ class SGDMechanism(BaseMechanism):
         
         self._log_setup(hyperparameters, train_dataset, val_dataset, test_dataset)
         
-        return model, device, train_loader, val_loader, hyperparameters
+        return model, device, train_loader, val_loader
 
     def _log_setup(self, hyperparameters, train_dataset, val_dataset, test_dataset):
         """Log training configuration and dataset information."""
@@ -198,7 +198,7 @@ class SGDMechanism(BaseMechanism):
             
             # Early stopping logic
             best_val_loss, patience_counter, should_save = self._should_stop_early(
-                val_loss, best_val_loss, patience_counter, hyperparameters.patience
+                val_loss, best_val_loss, patience_counter,
             )
             
             if should_save:
