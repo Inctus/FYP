@@ -1,9 +1,26 @@
 import abstract_gradient_training as agt
-from mechanism import BaseMechanism
+from mechanism import BaseMechanism, BaseHyperparameters
 
 from datasets import BaseDataset
 from util.privacy import PrivacyBudget
 from util.reproducibility import make_reproducible
+
+from dataclasses import dataclass
+
+
+@dataclass
+class AGTHyperparameters(BaseHyperparameters):
+    """
+    Hyperparameters for the AGT Mechanism.
+    Inherited Attributes:
+        - learning_rate: float
+        - n_epochs: int
+        - batch_size: int
+        - patience: int
+    Additional Attributes:
+        - clip_gamma: float
+    """
+    clip_gamma: float
 
 
 class AGTMechanism(BaseMechanism):
@@ -15,18 +32,18 @@ class AGTMechanism(BaseMechanism):
         super().__init__(model_constructor, dataset, privacy_budget)
         self.k_values = [0, 1, 10, 20, 50, 100] # TODO: Check how to derive these values from the dataset
 
-        print(f"AGT Mechanism initialized with k={self.k} and privacy budget: {self.privacy_budget}")
+        print(f"AGT Mechanism initialized with k_values={self.k_values} and privacy budget: {self.privacy_budget}")
 
-    def train(self, **kwargs):
+    def train(self, hyperparameters: AGTHyperparameters):
         model = self.model_constructor()
 
         config = agt.AGTConfig(
-            learning_rate=0.5,
-            n_epochs=5,
+            learning_rate=hyperparameters.learning_rate,
+            n_epochs=hyperparameters.n_epochs
             loss="cross_entropy",
             log_level="WARNING",
             device="cuda:0",
-            clip_gamma=0.1,
+            clip_gamma=hyperparameters.clip_gamma,
         )
         bounded_model_dict = {}  # we'll store our results for each value of 'k' as a dictionary from 'k' to the bounded model
 
