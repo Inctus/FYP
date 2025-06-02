@@ -78,9 +78,13 @@ class BaseMechanism(ABC):
         pass
 
     @abstractmethod
-    def predict(self):
+    def predict(self, n_queries: int):
         """
         Make predictions using the trained model.
+
+        Args:
+            n_queries (int): The number of queries to make with the trained model.
+                This is the number of predictions to return from the test set.
 
         Returns:
             The predictions made by the trained model.
