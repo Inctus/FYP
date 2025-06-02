@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from mechanism import BaseMechanism, TrainingResults
+from mechanism import BaseMechanism, TrainingResults, BaseHyperparameters
 # Opacus imports for differential privacy
 from opacus import PrivacyEngine
 from opacus.utils.batch_memory_manager import BatchMemoryManager
@@ -10,6 +10,24 @@ from torch.utils.data import DataLoader
 
 from datasets import BaseDataset
 from util.privacy import PrivacyBudget
+
+from dataclasses import dataclass
+
+
+@dataclass
+class DPSGDHyperparameters(BaseHyperparameters):
+    """
+    Hyperparameters for the DPSGD mechanism.
+    These hyperparameters are tailored for differential privacy training using Opacus.
+    Inherited Attributes:
+        num_epochs (int): Number of training epochs.
+        learning_rate (float): Learning rate for the optimizer.
+        batch_size (int): Size of each training batch.
+        patience (int): Number of epochs with no improvement before early stopping.
+    Additional Attributes:
+        max_grad_norm (float): Maximum gradient norm for clipping.
+    """
+    max_grad_norm: float = 1.0  # Maximum gradient norm for clipping
 
 
 class DPSGDMechanism(BaseMechanism):

@@ -11,25 +11,6 @@ from util.reproducibility import make_reproducible
 
 
 @dataclass
-class TrainingResults:
-    """
-    Represents the results of a training process.
-
-    Attributes:
-        auroc_score (float): The Area Under the Receiver Operating Characteristic Curve (AUROC) score of the model.
-        accuracy (float): The accuracy of the model on the test set.
-
-        mechanism_name (str): The name of the mechanism used for training.
-        hyperparameters (dict): The hyperparameters used during training.
-    """
-    auroc_score: float
-    accuracy: float
-    
-    mechanism_name: str
-    hyperparameters: dict
-
-
-@dataclass
 class BaseHyperparameters:
     """
     Represents the hyperparameters used for training a mechanism.
@@ -44,6 +25,25 @@ class BaseHyperparameters:
     n_epochs: int
     batch_size: int
     patience: int
+
+
+@dataclass
+class TrainingResults:
+    """
+    Represents the results of a training process.
+
+    Attributes:
+        auroc_score (float): The Area Under the Receiver Operating Characteristic Curve (AUROC) score of the model.
+        accuracy (float): The accuracy of the model on the test set.
+
+        mechanism_name (str): The name of the mechanism used for training.
+        hyperparameters (BaseHyperparameters): The hyperparameters used during training.
+    """
+    auroc_score: float
+    accuracy: float
+    
+    mechanism_name: str
+    hyperparameters: BaseHyperparameters
 
 
 class BaseMechanism(ABC):
