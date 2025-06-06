@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import abstract_gradient_training as agt
 import optuna
-from mechanism import BaseHyperparameters, BaseMechanism
+from mechanism import BaseHyperparameters, BaseMechanism, TrainingResults
 from torch.utils.data import DataLoader
 
 from datasets import BaseDataset
@@ -36,7 +36,7 @@ class AGTMechanism(BaseMechanism):
         self.bounded_model_dict = {}  # Dictionary to store bounded models for each k value
 
         print(f"AGT Mechanism initialized with k_values={self.k_values} and privacy budget: {self.privacy_budget}")
-
+    
     def train(self, hyperparameters: AGTHyperparameters):
         model = self.model_constructor()
 
@@ -65,35 +65,14 @@ class AGTMechanism(BaseMechanism):
             # as a metric, compute the number of predictions in the test set certified at this value of k_private
             certified_preds = agt.test_metrics.certified_predictions(bounded_model, test_dataset) # TODO: Amend this if it works haha it is meant
             print(f"Certified Predictions at k={k_private}: {certified_preds:.2f}")
-        
 
-        # TODO: Calculate AUROC and Accuracy over validation set
-        """s
-        Example code for computing accuracy using SS
-        
-        Let's use this set of bounded models to for better private prediction using the smooth sensitivity mechanism.
+        noise_free_val_acc_l = agt.test_metrics.test_accuracy(self.bounded_model_dict[0], val_dataset)[0]
 
-        epsilon = 0.5  # privacy loss
-        noise_free_acc = agt.test_metrics.test_accuracy(bounded_model_dict[0], x_test, y_test)[0]
-
-        # compute accuracy using the smooth sensitivity Cauchy mechanism
-        smooth_sens_noise_level = agt.privacy_utils.get_calibrated_noise_level(
-            x_test, bounded_model_dict, epsilon, noise_type="cauchy"
+        return TrainingResults(
+            accuracy= noise_free_val_acc_l,
+            mechanism_name="AGT SS Mechanism",
+            hyperparameters=hyperparameters,
         )
-        smooth_sens_acc = agt.privacy_utils.noisy_test_accuracy(
-            bounded_model_dict[0], x_test, y_test, noise_level=smooth_sens_noise_level, noise_type="cauchy"
-        )
-
-        # compute accuracy when using the global sensitivity mechanism
-        global_sens_acc = agt.privacy_utils.noisy_test_accuracy(
-            bounded_model_dict[0], x_test, y_test, noise_level=1.0 / epsilon
-        )
-
-        print(f"Noise Free Accuracy: {noise_free_acc:.2f}")
-        print(f"Smooth Sensitivity Accuracy: {smooth_sens_acc:.2f}")
-        print(f"Global Sensitivity Accuracy: {global_sens_acc:.2f}")
-        """
-
 
     def predict(self):
         raise NotImplementedError("AGT prediction not yet implemented.")
@@ -103,14 +82,32 @@ class AGTMechanism(BaseMechanism):
         Save the AGT mechanism to a file.
         This method should serialize the mechanism's state, including the model and hyperparameters.
         """
-        raise NotImplementedError("AGT save not yet implemented.")
+        for k_private, bounded_model in self.bounded_model_dict.items():
+            bounded_model.save_params(f"{path}/agt_model_k_{k_private}")
     
     def load(self, path: str):
         """
         Load the AGT mechanism from a file.
         This method should deserialize the mechanism's state, including the model and hyperparameters.
         """
-        raise NotImplementedError("AGT load not yet implemented.")
+        model = self.model_constructor()
+
+        for k_private in self.k_values:
+            bounded_model = agt.bounded_models.IntervalBoundedModel(model)
+            bounded_model.load_params(f"{path}/agt_model_k_{k_private}")
+            self.bounded_model_dict[k_private] = bounded_model
 
     def suggest_hyperparameters(self, trial: optuna.Trial):
-        raise NotImplementedError("AGT hyperparameter suggestion not yet implemented.")
+        trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True)
+        trial.suggest_int("n_epochs", 1, 100)
+        trial.suggest_int("batch_size", 1, 64)
+        trial.suggest_int("patience", 1, 10)
+        trial.suggest_float("clip_gamma", 0.0, 1.0)
+
+        return AGTHyperparameters(
+            learning_rate=trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True),
+            n_epochs=trial.suggest_int("n_epochs", 1, 100),
+            batch_size=trial.suggest_int("batch_size", 1, 64),
+            patience=trial.suggest_int("patience", 1, 10),
+            clip_gamma=trial.suggest_float("clip_gamma", 0.0, 1.0)
+        )
