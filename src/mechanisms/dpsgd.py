@@ -43,30 +43,12 @@ class DPSGDMechanism(BaseMechanism):
         super().__init__(model_constructor, dataset, privacy_budget)
         print(f"DPSGD Mechanism initialized with privacy budget: ε={privacy_budget.epsilon}, δ={privacy_budget.delta}")
     
-    def _setup_model_and_device(self):
+    def _setup_model_and_device(self, device):
         """Initialize model and set device."""
         model = self.model_constructor()
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
         print(f"Training on device: {device}")
         return model, device
-    
-    def _extract_hyperparameters(self, **kwargs):
-        """Extract and validate hyperparameters with DP-specific defaults."""
-        config = {
-            'num_epochs': kwargs.get('num_epochs', 100),
-            'learning_rate': kwargs.get('learning_rate', 0.01),
-            'batch_size': kwargs.get('batch_size', 32),
-            'max_grad_norm': kwargs.get('max_grad_norm', 1.0),  # DP-specific
-            'patience': kwargs.get('patience', 20)  # Reduced for DP training
-        }
-        
-        epsilon, delta = self.privacy_budget.epsilon, self.privacy_budget.delta
-        print(f"Target privacy budget: ε={epsilon}, δ={delta}")
-
-        self._log_training_config(config)
-        
-        return config, epsilon, delta
     
     def _log_training_config(self, config):
         """Log training configuration."""
@@ -266,20 +248,21 @@ class DPSGDMechanism(BaseMechanism):
                 all_labels.extend(batch_y.squeeze().cpu().numpy().tolist())
         
         val_accuracy = val_correct / val_total
-        val_auroc = roc_auc_score(all_labels, all_outputs)
-        return val_auroc, val_accuracy
 
-    def train(self, hyperparameters: DPSGDHyperparameters) -> TrainingResults:
+        return val_accuracy
+
+    def train(self, hyperparameters: DPSGDHyperparameters, device: str) -> TrainingResults:
         """
         Trains the model using DP-SGD.
 
         Args:
             hyperparameters (DPSGDHyperparameters): Hyperparameters for training.
+            device (str): The device to run the training on (e.g., 'cpu' or 'cuda').
         Returns:
             TrainingResults: A structured object containing training metrics and hyperparameters.
         """
         # Setup phase
-        model, device = self._setup_model_and_device()
+        model, device = self._setup_model_and_device(device)
         epsilon, delta = self.privacy_budget.epsilon, self.privacy_budget.delta
         train_loader, val_loader = self._setup_data_loaders(hyperparameters)
         
@@ -353,25 +336,23 @@ class DPSGDMechanism(BaseMechanism):
         
         # Final evaluation
         _, val_dataset, _ = self.dataset.to_torch(include_protected=False)
-        val_auroc, val_accuracy = self._evaluate_final_model_dp(model, val_dataset, device, hyperparameters.batch_size)
+        val_accuracy = self._evaluate_final_model_dp(model, val_dataset, device, hyperparameters.batch_size)
 
         # Save trained model
         self.model = model
         
         return TrainingResults(
-            auroc_score=val_auroc,
             accuracy=val_accuracy,
             mechanism_name="DPSGD",
             hyperparameters=hyperparameters
         )
 
-    def predict(self):
+    def predict(self, device: str):
         """
         Generate predictions on the test set using the trained model.
         Returns:
             List of prediction probabilities.
         """
-        device = next(self.model.parameters()).device
         _, _, test_dataset = self.dataset.to_torch(include_protected=False)
         test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
         

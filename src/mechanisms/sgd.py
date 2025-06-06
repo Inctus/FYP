@@ -23,11 +23,10 @@ class SGDMechanism(BaseMechanism):
         super().__init__(model_constructor, dataset, privacy_budget)
         print("Initialized SGDMechanism")
 
-    def _setup_training(self, hyperparameters: BaseHyperparameters):
+    def _setup_training(self, hyperparameters: BaseHyperparameters, device: str):
         """Setup model, device, data loaders, and hyperparameters."""
         # Model and device setup
         model = self.model_constructor()
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
         print(f"Training on device: {device}")
         
@@ -150,10 +149,10 @@ class SGDMechanism(BaseMechanism):
                 all_labels.extend(batch_y.squeeze().cpu().numpy().tolist())
         
         accuracy = correct / total
-        auroc = roc_auc_score(all_labels, all_outputs)
-        return auroc, accuracy
+
+        return accuracy
     
-    def train(self, hyperparameters: BaseHyperparameters) -> TrainingResults:
+    def train(self, hyperparameters: BaseHyperparameters, device: str) -> TrainingResults:
         """
         Trains the model using Stochastic Gradient Descent (SGD).
         Args:
@@ -162,11 +161,12 @@ class SGDMechanism(BaseMechanism):
                 - learning_rate (float): Learning rate for the optimizer.
                 - batch_size (int): Size of each training batch.
                 - patience (int): Early stopping patience.
+            device (str): Device to run the training on (e.g., 'cpu' or 'cuda').
         Returns:
             TrainingResults: Contains AUROC score, accuracy, mechanism name, and hyperparameters.
         """
         # Setup phase
-        model, device, train_loader, val_loader = self._setup_training(hyperparameters)
+        model, device, train_loader, val_loader = self._setup_training(hyperparameters, device)
         optimizer, criterion = self._setup_optimizer_and_criterion(model, hyperparameters.learning_rate)
 
         # Training tracking variables
@@ -218,25 +218,23 @@ class SGDMechanism(BaseMechanism):
         
         # Final evaluation
         _, val_dataset, _ = self.dataset.to_torch(include_protected=False)
-        val_auroc, val_accuracy = self._evaluate_final_model(model, val_dataset, device, hyperparameters.batch_size)
+        val_accuracy = self._evaluate_final_model(model, val_dataset, device, hyperparameters.batch_size)
         
         # Save trained model
         self.model = model
         
         return TrainingResults(
-            auroc_score=val_auroc,
             accuracy=val_accuracy,
             mechanism_name="SGD",
             hyperparameters=hyperparameters
         )
     
-    def predict(self):
+    def predict(self, device: str):
         """
         Generate predictions on the test set using the trained model.
         Returns:
             List of prediction probabilities.
         """
-        device = next(self.model.parameters()).device
         _, _, test_dataset = self.dataset.to_torch(include_protected=False)
         test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
         

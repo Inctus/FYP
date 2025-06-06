@@ -37,7 +37,7 @@ class AGTMechanism(BaseMechanism):
 
         print(f"AGT Mechanism initialized with k_values={self.k_values} and privacy budget: {self.privacy_budget}")
     
-    def train(self, hyperparameters: AGTHyperparameters):
+    def train(self, hyperparameters: AGTHyperparameters, device: str):
         model = self.model_constructor()
 
         config = agt.AGTConfig(
@@ -45,7 +45,7 @@ class AGTMechanism(BaseMechanism):
             n_epochs=hyperparameters.n_epochs,
             loss="cross_entropy",
             log_level="WARNING",
-            device="cuda:0",
+            device=device,
             clip_gamma=hyperparameters.clip_gamma,
         )
 
@@ -74,7 +74,7 @@ class AGTMechanism(BaseMechanism):
             hyperparameters=hyperparameters,
         )
 
-    def predict(self):
+    def predict(self, device: str):
         raise NotImplementedError("AGT prediction not yet implemented.")
 
     def save(self, path: str):
@@ -98,16 +98,16 @@ class AGTMechanism(BaseMechanism):
             self.bounded_model_dict[k_private] = bounded_model
 
     def suggest_hyperparameters(self, trial: optuna.Trial):
-        trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True)
-        trial.suggest_int("n_epochs", 1, 100)
-        trial.suggest_int("batch_size", 1, 64)
-        trial.suggest_int("patience", 1, 10)
-        trial.suggest_float("clip_gamma", 0.0, 1.0)
+        learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True)
+        n_epochs = trial.suggest_int("n_epochs", 1, 100)
+        batch_size = trial.suggest_int("batch_size", 1, 64)
+        patience = trial.suggest_int("patience", 1, 10)
+        clip_gamma = trial.suggest_float("clip_gamma", 0.0, 1.0)
 
         return AGTHyperparameters(
-            learning_rate=trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True),
-            n_epochs=trial.suggest_int("n_epochs", 1, 100),
-            batch_size=trial.suggest_int("batch_size", 1, 64),
-            patience=trial.suggest_int("patience", 1, 10),
-            clip_gamma=trial.suggest_float("clip_gamma", 0.0, 1.0)
+            learning_rate=learning_rate,
+            n_epochs=n_epochs,
+            batch_size=batch_size,
+            patience=patience,
+            clip_gamma=clip_gamma   
         )

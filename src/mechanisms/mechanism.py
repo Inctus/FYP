@@ -41,7 +41,6 @@ class TrainingResults:
         mechanism_name (str): The name of the mechanism used for training.
         hyperparameters (BaseHyperparameters): The hyperparameters used during training.
     """
-    auroc_score: float
     accuracy: float
     
     mechanism_name: str
@@ -65,7 +64,7 @@ class BaseMechanism(ABC):
         self.privacy_budget = privacy_budget
 
     @abstractmethod
-    def train(self, hyperparameters: BaseHyperparameters) -> TrainingResults:
+    def train(self, hyperparameters: BaseHyperparameters, device: str) -> TrainingResults:
         """
         Train the mechanism on the dataset with the given privacy budget.
         This modifies the internal state of the class to include the trained model.
@@ -73,6 +72,7 @@ class BaseMechanism(ABC):
 
         Args:
             hyperparameters (BaseHyperparameters): Hyperparameters for the training process.
+            device (str): The device to use for training (e.g., 'cpu' or 'cuda').
 
         Returns:
             The results of the training process.
@@ -80,13 +80,14 @@ class BaseMechanism(ABC):
         pass
 
     @abstractmethod
-    def predict(self, n_queries: int):
+    def predict(self, n_queries: int, device: str):
         """
         Make predictions using the trained model.
 
         Args:
             n_queries (int): The number of queries to make with the trained model.
                 This is the number of predictions to return from the test set.
+            device (str): The device to use for inference (e.g., 'cpu' or 'cuda').
 
         Returns:
             The predictions made by the trained model.
