@@ -61,7 +61,6 @@ class BaseMechanism(ABC):
         
         self.model_constructor = model_constructor
         self.dataset = dataset
-        # self.trained_model is removed. State is managed via save/load.
 
     @abstractmethod
     def train(self, hyperparameters: BaseHyperparameters, device: str) -> TrainingResults:
@@ -137,6 +136,13 @@ class DPLearningMechanism(BaseMechanism):
     The training API includes a privacy budget.
     Prediction is non-private over the entire test set, using the state established by `load()`.
     """
+    def __init__(self, model_constructor, dataset: BaseDataset):
+        """
+        Initializes the DPLearningMechanism with a model constructor and dataset.
+        Ensures reproducibility across runs.
+        """
+        super().__init__(model_constructor, dataset)
+
     @abstractmethod
     def train(self, hyperparameters: BaseHyperparameters, privacy_budget: PrivacyBudget, device: str) -> TrainingResults:
         """
@@ -156,11 +162,6 @@ class DPLearningMechanism(BaseMechanism):
         """
         pass
 
-    # The 'predict', 'save', 'load', and 'suggest_hyperparameters' methods are inherited
-    # from BaseMechanism and must be implemented by concrete subclasses.
-    # predict(self, device: str) -> Any: for inference on the whole test set (non-privately),
-    # relies on state loaded by load().
-
 
 class DPPredictionMechanism(BaseMechanism):
     """
@@ -168,11 +169,12 @@ class DPPredictionMechanism(BaseMechanism):
     Training is standard (non-private). The trained state is managed via `save` and `load`.
     The prediction API includes a number of queries and a privacy budget for those queries.
     """
-
-    # The 'train', 'save', 'load', and 'suggest_hyperparameters' methods are inherited
-    # from BaseMechanism and must be implemented by concrete subclasses.
-    # train(self, hyperparameters: BaseHyperparameters, device: str) -> TrainingResults: for standard training.
-    # The state from training should be savable via `save` and restorable via `load`.
+    def __init__(self, model_constructor, dataset: BaseDataset):
+        """
+        Initializes the DPPredictionMechanism with a model constructor and dataset.
+        Ensures reproducibility across runs.
+        """
+        super().__init__(model_constructor, dataset)
 
     @abstractmethod
     def predict(self, n_queries: int, privacy_budget: PrivacyBudget, device: str) -> Any:
