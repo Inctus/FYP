@@ -1,3 +1,3 @@
-from mlp import MLP
+from mlp import BinaryClassificationMLP
 
-__all__ = ['MLP']
+__all__ = ['BinaryClassificationMLP']

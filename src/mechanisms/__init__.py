@@ -1,11 +1,12 @@
-from agt import AGTMechanism
-from dpsgd import DPSGDMechanism
-from pate import PateMechanism
-from sgd import SGDMechanism
+from agt_ss import AGTMechanism, AGTHyperparameters
+from dpsgd import DPSGDMechanism, DPSGDHyperparameters
+from sgd import SGDMechanism, BaseHyperparameters
 
 __all__ = [
     "AGTMechanism",
     "DPSGDMechanism",
-    "PateMechanism",
-    "SGDMechanism"
+    "SGDMechanism",
+    "BaseHyperparameters",
+    "DPSGDHyperparameters",
+    "AGTHyperparameters"
 ]

@@ -66,8 +66,8 @@ class BaseDataset(ABC):
             AIF360 dataset object
         """
         raise NotImplementedError("load_data() must be implemented in subclasses")
-    
-    def to_torch(self, include_protected=True) -> Tuple[FairnessDataset, FairnessDataset, FairnessDataset]:
+
+    def to_torch(self) -> Tuple[FairnessDataset, FairnessDataset, FairnessDataset]:
         """
         Processes the AIF360 dataset:
         1. Extracts features, labels, and (optionally) protected attributes.
@@ -96,13 +96,12 @@ class BaseDataset(ABC):
             raise ValueError("Dataset contains no features")
         
         prot_all_np = None
-        if include_protected:
-            if (hasattr(aif360_data, 'protected_attributes') and 
-                aif360_data.protected_attributes is not None and
-                aif360_data.protected_attributes.shape[1] > 0):
-                prot_all_np = aif360_data.protected_attributes.astype(np.float32)
-            else:
-                print("Warning: include_protected is True, but protected_attributes are not available or empty.")
+        if (hasattr(aif360_data, 'protected_attributes') and 
+            aif360_data.protected_attributes is not None and
+            aif360_data.protected_attributes.shape[1] > 0):
+            prot_all_np = aif360_data.protected_attributes.astype(np.float32)
+        else:
+            print("Warning: Protected_attributes are not available or empty.")
 
         # 2. Create deterministic split indices - SIMPLIFIED APPROACH
         total_size = X_all_np.shape[0]
@@ -145,9 +144,9 @@ class BaseDataset(ABC):
             X_test_np = scaler.transform(X_test_np)
 
         # 5. Create FairnessDataset instances
-        train_dataset = FairnessDataset(X_train_np, y_train_np, prot_train_np if include_protected else None)
-        val_dataset = FairnessDataset(X_val_np, y_val_np, prot_val_np if include_protected else None)
-        test_dataset = FairnessDataset(X_test_np, y_test_np, prot_test_np if include_protected else None)
+        train_dataset = FairnessDataset(X_train_np, y_train_np)
+        val_dataset = FairnessDataset(X_val_np, y_val_np)
+        test_dataset = FairnessDataset(X_test_np, y_test_np, prot_test_np)
         
         print(f"Dataset sizes - Train: {len(train_dataset)}, Val: {len(val_dataset)}, Test: {len(test_dataset)}")
         

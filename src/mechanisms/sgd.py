@@ -4,11 +4,9 @@ import optuna
 import torch
 import torch.nn as nn
 from mechanism import BaseHyperparameters, BaseMechanism, TrainingResults
-from sklearn.metrics import roc_auc_score
 from torch.utils.data import DataLoader
 
 from datasets import BaseDataset
-from util.privacy import PrivacyBudget
 
 
 class SGDMechanism(BaseMechanism):
@@ -19,8 +17,8 @@ class SGDMechanism(BaseMechanism):
     and handles the dual-output nature of our MLP model.
     """
     
-    def __init__(self, model_constructor, dataset: BaseDataset, privacy_budget: PrivacyBudget):
-        super().__init__(model_constructor, dataset, privacy_budget)
+    def __init__(self, model_constructor, dataset: BaseDataset):
+        super().__init__(model_constructor, dataset)
         print("Initialized SGDMechanism")
 
     def _setup_training(self, hyperparameters: BaseHyperparameters, device: str):
@@ -31,7 +29,7 @@ class SGDMechanism(BaseMechanism):
         print(f"Training on device: {device}")
         
         # Dataset setup
-        train_dataset, val_dataset, test_dataset = self.dataset.to_torch(include_protected=False)
+        train_dataset, val_dataset, test_dataset = self.dataset.to_torch()
         
         # Data loaders
         train_loader = DataLoader(train_dataset, batch_size=hyperparameters.batch_size, shuffle=True)

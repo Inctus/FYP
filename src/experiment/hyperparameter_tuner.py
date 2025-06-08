@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Type, Dict, Any
 
 from mechanisms.mechanism import BaseMechanism, DPPredictionMechanism, BaseHyperparameters, DPLearningMechanism
-from models.mlp import MLP # Assuming MLP is a common model to tune
+from models.mlp import BinaryClassificationMLP # Assuming MLP is a common model to tune
 from datasets import BaseDataset # Assuming BaseDataset is the type for dataset
 
 from util.constants import HYPERPARAMETER_RESULTS_DIR
@@ -14,7 +14,7 @@ class HyperparameterTuner:
     A class to perform hyperparameter tuning for mechanisms using Optuna.
     It tunes both mechanism-specific hyperparameters and model architectural hyperparameters (specifically for MLP).
     """
-    def __init__(self, mechanism_class: Type[BaseMechanism], model_class: Type[MLP], dataset: BaseDataset, device: str):
+    def __init__(self, mechanism_class: Type[BaseMechanism], model_class: Type[BinaryClassificationMLP], dataset: BaseDataset, device: str):
         """
         Initializes the HyperparameterTuner.
 
