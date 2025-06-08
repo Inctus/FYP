@@ -1,9 +1,11 @@
 """
-A mechanism should take an untrained model, a dataset, privacy budget and (a set of hyperparameters) and return a trained model.
+A mechanism should take an untrained model, a dataset, privacy budget (if applicable) 
+and (a set of hyperparameters) and return a trained model or allow predictions.
 """
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any
 
 import optuna
 
@@ -15,7 +17,7 @@ from util.reproducibility import make_reproducible
 @dataclass
 class BaseHyperparameters:
     """
-    Represents the hyperparameters used for training a mechanism.
+    Represents the base hyperparameters used for training a mechanism.
 
     Attributes:
         learning_rate (float): The learning rate for the optimizer.
@@ -35,25 +37,23 @@ class TrainingResults:
     Represents the results of a training process.
 
     Attributes:
-        auroc_score (float): The Area Under the Receiver Operating Characteristic Curve (AUROC) score of the model.
-        accuracy (float): The accuracy of the model on the test set.
-
+        accuracy (float): The accuracy of the model on a relevant dataset (e.g., test or validation).
         mechanism_name (str): The name of the mechanism used for training.
         hyperparameters (BaseHyperparameters): The hyperparameters used during training.
     """
     accuracy: float
-    
     mechanism_name: str
     hyperparameters: BaseHyperparameters
 
 
 class BaseMechanism(ABC):
     """
-    A base class for mechanisms that train models with differential privacy.
-
-    TODO: Refactor this to make the init functions 
+    A base class for mechanisms that train models.
+    This class defines the API for non-private training and prediction over the entire test set.
+    The mechanism itself does not store the trained model state directly after training;
+    `save` and `load` methods are used to manage the persistence and restoration of this state.
     """
-    def __init__(self, model_constructor, dataset: BaseDataset, privacy_budget: PrivacyBudget):
+    def __init__(self, model_constructor, dataset: BaseDataset):
         """
         A basic initialisation that makes sure mechanisms are reproducible.
         """
@@ -61,68 +61,135 @@ class BaseMechanism(ABC):
         
         self.model_constructor = model_constructor
         self.dataset = dataset
-        self.privacy_budget = privacy_budget
+        # self.trained_model is removed. State is managed via save/load.
 
     @abstractmethod
     def train(self, hyperparameters: BaseHyperparameters, device: str) -> TrainingResults:
         """
-        Train the mechanism on the dataset with the given privacy budget.
-        This modifies the internal state of the class to include the trained model.
-        The trained model is not returned directly, but we expose functionality using the "predict" method.
+        Train the mechanism using the provided hyperparameters on the specified device.
+        This method is responsible for the training process but does not necessarily
+        store the final trained state within the instance. The state should be
+        savable via the `save` method.
 
         Args:
             hyperparameters (BaseHyperparameters): Hyperparameters for the training process.
             device (str): The device to use for training (e.g., 'cpu' or 'cuda').
 
         Returns:
-            The results of the training process.
+            TrainingResults: The results of the training process.
         """
         pass
 
     @abstractmethod
-    def predict(self, n_queries: int, device: str):
+    def predict(self, device: str) -> Any:
         """
-        Make predictions using the trained model.
+        Make predictions using the state established by `load()` (or a preceding `train()`
+        call if the mechanism's implementation supports it).
+        Predictions are made over the entire test set.
 
         Args:
-            n_queries (int): The number of queries to make with the trained model.
-                This is the number of predictions to return from the test set.
             device (str): The device to use for inference (e.g., 'cpu' or 'cuda').
 
         Returns:
-            The predictions made by the trained model.
+            Any: The predictions (e.g., raw scores or class labels).
         """
         pass
 
     @abstractmethod
     def save(self, path: str):
         """
-        Save the trained model to a file.
+        Save the trainable state of the mechanism (e.g., model parameters, ensemble components)
+        to a file. This state should be sufficient to later `load` and `predict`.
 
         Args:
-            path (str): The path where the model should be saved.
+            path (str): The path where the state should be saved.
         """
         pass
 
     @abstractmethod
     def load(self, path: str):
         """
-        Load a trained model from a file.
+        Load the trainable state of the mechanism from a file.
+        This prepares the mechanism for making predictions via the `predict` method.
 
         Args:
-            path (str): The path from which the model should be loaded.
+            path (str): The path from which the state should be loaded.
         """
         pass
 
     @abstractmethod
-    def suggest_hyperparameters(self, trail: optuna.Trial) -> BaseHyperparameters:
+    def suggest_hyperparameters(self, trial: optuna.Trial) -> BaseHyperparameters:
         """
-        Suggest hyperparameters for the mechanism based on the given trial.
+        Suggest hyperparameters for the mechanism based on the given Optuna trial.
 
         Args:
             trial (optuna.Trial): The trial object from Optuna.
 
         Returns:
             BaseHyperparameters: Suggested hyperparameters for the mechanism.
+        """
+        pass
+
+
+class DPLearningMechanism(BaseMechanism):
+    """
+    A base class for mechanisms that train models with differential privacy during the learning process.
+    The training API includes a privacy budget.
+    Prediction is non-private over the entire test set, using the state established by `load()`.
+    """
+    @abstractmethod
+    def train(self, hyperparameters: BaseHyperparameters, privacy_budget: PrivacyBudget, device: str) -> TrainingResults:
+        """
+        Train the mechanism with differential privacy, using the provided hyperparameters,
+        privacy budget, on the specified device.
+        The resulting state should be savable via the `save` method.
+
+        Note: This method overrides BaseMechanism.train with an additional privacy_budget parameter.
+
+        Args:
+            hyperparameters (BaseHyperparameters): Hyperparameters for the training process.
+            privacy_budget (PrivacyBudget): The privacy budget for DP training.
+            device (str): The device to use for training (e.g., 'cpu' or 'cuda').
+
+        Returns:
+            TrainingResults: The results of the training process.
+        """
+        pass
+
+    # The 'predict', 'save', 'load', and 'suggest_hyperparameters' methods are inherited
+    # from BaseMechanism and must be implemented by concrete subclasses.
+    # predict(self, device: str) -> Any: for inference on the whole test set (non-privately),
+    # relies on state loaded by load().
+
+
+class DPPredictionMechanism(BaseMechanism):
+    """
+    A base class for mechanisms that apply differential privacy during the prediction phase.
+    Training is standard (non-private). The trained state is managed via `save` and `load`.
+    The prediction API includes a number of queries and a privacy budget for those queries.
+    """
+
+    # The 'train', 'save', 'load', and 'suggest_hyperparameters' methods are inherited
+    # from BaseMechanism and must be implemented by concrete subclasses.
+    # train(self, hyperparameters: BaseHyperparameters, device: str) -> TrainingResults: for standard training.
+    # The state from training should be savable via `save` and restorable via `load`.
+
+    @abstractmethod
+    def predict(self, n_queries: int, privacy_budget: PrivacyBudget, device: str) -> Any:
+        """
+        Make a specified number of predictions using the state established by `load()`,
+        applying differential privacy to the prediction process.
+        The privacy budget is spent over these queries.
+
+        Note: This method overrides BaseMechanism.predict with additional parameters
+              n_queries and privacy_budget.
+
+        Args:
+            n_queries (int): The number of queries (predictions) to make.
+            privacy_budget (PrivacyBudget): The privacy budget for these queries.
+            device (str): The device to use for inference (e.g., 'cpu' or 'cuda').
+
+        Returns:
+            Any: The private predictions made by the model.
         """
         pass
