@@ -8,7 +8,6 @@ from mechanism import BaseHyperparameters, BaseMechanism, TrainingResults
 from opacus import PrivacyEngine
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
-from sklearn.metrics import roc_auc_score
 from torch.utils.data import DataLoader
 
 from datasets import BaseDataset
