@@ -3,6 +3,22 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import optuna
+from dataclasses import dataclass
+
+@dataclass
+class MLPHyperparameters:
+    """
+    Represents the hyperparameters for the MLP model.
+    
+    Attributes:
+        mlp_layers (list): List of integers representing the number of neurons in each hidden layer.
+        p_dropout (float): Dropout probability for regularization.
+        num_classes (int): Number of output classes for classification tasks.
+    """
+    mlp_layers: list
+    p_dropout: float
+
 
 class MLP(nn.Module):
     """
@@ -12,9 +28,9 @@ class MLP(nn.Module):
     and includes some modifications for better integration with our training framework.
     """
     
-    def __init__(self, n_features, mlp_layers=[128, 32], p_dropout=0.2, num_classes=1):
+    def __init__(self, n_features, mlp_layers=[128, 32], p_dropout=0.2):
         super(MLP, self).__init__()
-        self.num_classes = num_classes
+        self.num_classes = 1
         self.mlp_layers = [n_features] + mlp_layers
         self.p_dropout = p_dropout
         
@@ -24,7 +40,7 @@ class MLP(nn.Module):
         ])
         
         # Final classification head
-        self.head = nn.Linear(self.mlp_layers[-1], num_classes)
+        self.head = nn.Linear(self.mlp_layers[-1], 1)
     
     def forward(self, x):
         """
@@ -47,3 +63,21 @@ class MLP(nn.Module):
         logits = torch.sigmoid(x)
         
         return h, logits
+
+    def suggest_hyperparameters(self, trial: optuna.Trial) -> MLPHyperparameters:
+        """
+        Suggest hyperparameters for the MLP model based on the given Optuna trial.
+        
+        Args:
+            trial (optuna.Trial): The trial object from Optuna.
+        
+        Returns:
+            MLPHyperparameters: Suggested hyperparameters for the MLP model.
+        """
+        mlp_layers = [
+            trial.suggest_categorical(f"mlp_hidden_dim_l{i}", [32, 64, 128, 256])
+            for i in range(2)
+        ]
+        p_dropout = trial.suggest_float("mlp_dropout_p", 0.0, 0.5, step=0.1)
+        
+        return MLPHyperparameters(mlp_layers=mlp_layers, p_dropout=p_dropout)
