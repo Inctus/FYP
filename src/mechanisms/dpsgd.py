@@ -396,7 +396,7 @@ class DPSGDMechanism(BaseMechanism):
         """
         n_epochs = trial.suggest_int("num_epochs", 50, 200, step=10)
         learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
-        batch_size = trial.suggest_categorical("batch_size", [16, 32, 64, 128])
+        batch_size = trial.suggest_categorical("batch_size",  [32, 64, 128, 256, 512])
         patience = trial.suggest_int("patience", 5, 30, step=5)
         max_grad_norm = trial.suggest_float("max_grad_norm", 0.1, 5.0, log=True)
 
