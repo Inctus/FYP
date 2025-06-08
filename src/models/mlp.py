@@ -64,7 +64,8 @@ class BinaryClassificationMLP(nn.Module):
         
         return h, logits
 
-    def suggest_hyperparameters(self, trial: optuna.Trial) -> MLPHyperparameters:
+    @staticmethod
+    def suggest_hyperparameters(trial: optuna.Trial) -> MLPHyperparameters:
         """
         Suggest hyperparameters for the MLP model based on the given Optuna trial.
         
