@@ -20,20 +20,20 @@ class MLPHyperparameters:
     p_dropout: float
 
 
-class MLP(nn.Module):
+class BinaryClassificationMLP(nn.Module):
     """
-    Multi-Layer Perceptron for classification tasks.
+    Multi-Layer Perceptron for binary classification tasks.
     
     This implementation is based on the Fair-Fairness Benchmark repository
     and includes some modifications for better integration with our training framework.
     """
     
-    def __init__(self, n_features, mlp_layers=[128, 32], p_dropout=0.2):
-        super(MLP, self).__init__()
+    def __init__(self, n_features, hyperparameters: MLPHyperparameters):
+        super(BinaryClassificationMLP, self).__init__()
         self.num_classes = 1
-        self.mlp_layers = [n_features] + mlp_layers
-        self.p_dropout = p_dropout
-        
+        self.mlp_layers = [n_features] + hyperparameters.mlp_layers
+        self.p_dropout = hyperparameters.p_dropout
+
         # Create the hidden layers
         self.network = nn.ModuleList([
             nn.Linear(i, o) for i, o in zip(self.mlp_layers[:-1], self.mlp_layers[1:])
