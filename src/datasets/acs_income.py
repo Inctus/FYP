@@ -3,9 +3,8 @@ from folktables import ACSDataSource, ACSIncome
 
 from aif360.datasets import StandardDataset
 from datasets.dataset import BaseDataset # Assuming this is in the parent directory or PYTHONPATH
+from util.constants import FOLKTABLES_DATA_PATH
 
-# Fixed data path as per your notebook
-FOLKTABLES_DATA_PATH = "/vol/bitbucket/hh2721/folktables"
 
 class ACSIncomeDataset(BaseDataset):
     """

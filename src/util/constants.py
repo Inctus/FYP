@@ -12,3 +12,8 @@ TEST_SPLIT = 0.15
 assert TRAIN_SPLIT + VAL_SPLIT + TEST_SPLIT == 1.0, \
     "Train, validation, and test splits must sum to 1.0"
 
+# Fixed data path as per your notebook
+FOLKTABLES_DATA_PATH = "/vol/bitbucket/hh2721/folktables"
+
+# Hyperparameter results directory
+HYPERPARAMETER_RESULTS_DIR = "hyperparameter_results"
