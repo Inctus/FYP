@@ -55,6 +55,7 @@ class BaseDataset(ABC):
     def __init__(self):
         """Initialize the dataset by loading the underlying AIF360 data."""
         self._aif360_dataset_original = self.load_data()
+        self.n_features = self._aif360_dataset_original.features.shape[1]
     
     @abstractmethod
     def load_data(self):

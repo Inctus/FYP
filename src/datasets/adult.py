@@ -2,8 +2,6 @@ from aif360.datasets import AdultDataset as Aif360AdultDataset
 
 from datasets.dataset import BaseDataset
 
-ADULT_DATA_FEATURES = 102
-
 
 class AdultDataset(BaseDataset):
     """
@@ -38,9 +36,5 @@ class AdultDataset(BaseDataset):
             na_values=['?'],  # Handle missing values
             custom_preprocessing=lambda df: df.dropna()  # Simple approach: drop missing values
         )
-
-        # Verify the expected feature dimensionality
-        assert adult_ds.features.shape[1] == ADULT_DATA_FEATURES, \
-            f"Expected {ADULT_DATA_FEATURES} features, got {adult_ds.features.shape[1]}"
 
         return adult_ds

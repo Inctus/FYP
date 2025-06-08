@@ -22,7 +22,7 @@ class ACSTravelTimeDataset(BaseDataset):
     like one-hot encoding via AIF360's StandardDataset.
 
     Folktables features for ACSTravelTime:
-    ['AGEP', 'SCHL', 'MAR', 'SEX', 'DIS', 'ESP', 'CIT', 'MIL', 'ANC', 'NATIVITY', 'RELP', 'DEAR', 'DEYE', 'DREM', 'RAC1P', 'COW', 'ESR', 'WKHP', 'JWMNP', 'PINCP']
+    ['AGEP','SCHL','MAR','DIS','ESP','MIG','RELP','PUMA','ST','CIT','OCCP','JWTR','POWPUMA','POVPIP']
     Target: JWMNP (Travel time to work) > 20 minutes (binary)
     Protected Attribute: SEX (1 for Male, 2 for Female. Privileged is Male (1.0)).
     """
@@ -84,12 +84,11 @@ class ACSTravelTimeDataset(BaseDataset):
         protected_attribute_names = [self._SENSITIVE_ATTRIBUTE_NAME]
         privileged_classes = [[1.0]] 
 
-        # ACSTravelTime.features: ['AGEP', 'SCHL', 'MAR', 'SEX', 'DIS', 'ESP', 'CIT', 'MIL', 'ANC', 'NATIVITY', 'RELP', 'DEAR', 'DEYE', 'DREM', 'RAC1P', 'COW', 'ESR', 'WKHP', 'JWMNP', 'PINCP']
+        # ACSTravelTime.features: ['AGEP', 'SCHL', 'MAR', 'SEX', 'DIS', 'ESP', 'MIG', 'RELP', 'RAC1P', 'PUMA', 'ST', 'CIT', 'OCCP', 'JWTR', 'POWPUMA', 'POVPIP']
         # 'SEX' is the protected attribute. Other categorical features need one-hot encoding.
-        categorical_features_for_encoding = ['SCHL', 'MAR', 'DIS', 'ESP', 'CIT', 'MIL', 'ANC', 'NATIVITY', 'RELP', 'DEAR', 'DEYE', 'DREM', 'RAC1P', 'COW', 'ESR']
-        
+        categorical_features_for_encoding = ["SCHL", "MAR", "DIS", "ESP", "MIG", "RELP", "RAC1P", "PUMA", "ST", "CIT", "OCCP", "JWTR", "POWPUMA"]
         # Ensure all columns exist
-        all_expected_cols = categorical_features_for_encoding + protected_attribute_names + ['AGEP', 'WKHP', 'JWMNP', 'PINCP']
+        all_expected_cols = categorical_features_for_encoding + protected_attribute_names + ['AGEP', 'POVPIP']
         for col in all_expected_cols:
             if col not in df.columns:
                 raise ValueError(f"Expected column '{col}' not found in ACSTravelTime features for the given configuration.")

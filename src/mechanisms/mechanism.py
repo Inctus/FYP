@@ -9,7 +9,7 @@ from typing import Any
 
 import optuna
 
-from datasets import BaseDataset
+from datasets.dataset import BaseDataset
 from util.privacy import PrivacyBudget
 from util.reproducibility import make_reproducible
 

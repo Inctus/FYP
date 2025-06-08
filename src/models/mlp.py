@@ -14,7 +14,6 @@ class MLPHyperparameters:
     Attributes:
         mlp_layers (list): List of integers representing the number of neurons in each hidden layer.
         p_dropout (float): Dropout probability for regularization.
-        num_classes (int): Number of output classes for classification tasks.
     """
     mlp_layers: list
     p_dropout: float

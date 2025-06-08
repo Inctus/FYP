@@ -1,8 +1,6 @@
-from typing import Tuple
+from mechanisms.mechanism import BaseMechanism
 
-from mechanism import BaseMechanism
-
-from datasets import BaseDataset
+from datasets.dataset import BaseDataset
 from util.privacy import PrivacyBudget
 
 

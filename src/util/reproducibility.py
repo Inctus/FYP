@@ -2,7 +2,7 @@ import random
 
 import numpy as np
 import torch
-from constants import RANDOM_SEED
+from util.constants import RANDOM_SEED
 
 
 def make_reproducible():

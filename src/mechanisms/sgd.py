@@ -3,10 +3,10 @@ from dataclasses import asdict
 import optuna
 import torch
 import torch.nn as nn
-from mechanism import BaseHyperparameters, BaseMechanism, TrainingResults
+from mechanisms.mechanism import BaseHyperparameters, BaseMechanism, TrainingResults
 from torch.utils.data import DataLoader
 
-from datasets import BaseDataset
+from datasets.dataset import BaseDataset
 
 
 class SGDMechanism(BaseMechanism):
@@ -215,7 +215,7 @@ class SGDMechanism(BaseMechanism):
             print("Restored best model weights from validation phase")
         
         # Final evaluation
-        _, val_dataset, _ = self.dataset.to_torch(include_protected=False)
+        _, val_dataset, _ = self.dataset.to_torch()
         val_accuracy = self._evaluate_final_model(model, val_dataset, device, hyperparameters.batch_size)
         
         # Save trained model
@@ -233,7 +233,7 @@ class SGDMechanism(BaseMechanism):
         Returns:
             List of prediction probabilities.
         """
-        _, _, test_dataset = self.dataset.to_torch(include_protected=False)
+        _, _, test_dataset = self.dataset.to_torch()
         test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
         
         self.model.eval()

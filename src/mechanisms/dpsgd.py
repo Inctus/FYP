@@ -10,7 +10,7 @@ from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
 from torch.utils.data import DataLoader
 
-from datasets import BaseDataset
+from datasets.dataset import BaseDataset
 from util.privacy import PrivacyBudget
 
 

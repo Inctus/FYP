@@ -5,7 +5,7 @@ import optuna
 from mechanism import BaseHyperparameters, BaseMechanism, TrainingResults
 from torch.utils.data import DataLoader
 
-from datasets import BaseDataset
+from datasets.dataset import BaseDataset
 from util.privacy import PrivacyBudget
 from util.reproducibility import make_reproducible
 

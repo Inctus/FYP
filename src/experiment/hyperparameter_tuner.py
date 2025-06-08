@@ -3,9 +3,9 @@ import json
 from pathlib import Path
 from typing import Type, Dict, Any
 
-from mechanisms.mechanism import BaseMechanism, DPPredictionMechanism, BaseHyperparameters, DPLearningMechanism
+from mechanisms.mechanism import BaseMechanism, DPLearningMechanism
 from models.mlp import BinaryClassificationMLP # Assuming MLP is a common model to tune
-from datasets import BaseDataset # Assuming BaseDataset is the type for dataset
+from datasets.dataset import BaseDataset
 
 from util.constants import HYPERPARAMETER_RESULTS_DIR
 
@@ -96,7 +96,7 @@ class HyperparameterTuner:
         study.optimize(self.objective, n_trials=n_trials)
 
         best_trial = study.best_trial
-        print(f"\nBest trial for {self.mechanism_class.__name__} on {self.dataset.name}:")
+        print(f"\nBest trial for {study_name}:")
         print(f"  Value accuracy: {best_trial.value}")
         print("  Best Hyperparameters (includes model and mechanism params):")
         for key, value in best_trial.params.items():
