@@ -76,7 +76,6 @@ class DPHyperparameterTuner:
     from the overall (ε,δ) and γ, accounting for the extra privacy loss due to
     repeating the run K ~ D_{0,γ}.
     """
-    # ────────────────────────────────────────────────────────────────
     def __init__(self,
                  mechanism_class: DPLearningMechanism,
                  dataset: BaseDataset,
@@ -91,7 +90,6 @@ class DPHyperparameterTuner:
         self.global_privacy_budget = privacy_budget
         self.privacy_budget: PrivacyBudget | None = None   # set later
 
-    # ────────────────────────────────────────────────────────────────
     def _sample_logarithmic_distribution(self, gamma: float) -> int:
         """
         One draw K ~ D_{0,γ}.  The SciPy log-series parameter p = 1 - γ.
