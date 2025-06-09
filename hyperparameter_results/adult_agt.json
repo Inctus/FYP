@@ -1,0 +1,12 @@
+{
+    "mlp_layer_0": 32,
+    "mlp_layer_1": 16,
+    "learning_rate": 0.167218967312418,
+    "n_epochs": 10,
+    "batch_size": 45222,
+    "patience": 50,
+    "clip_gamma": 0.5640769807146417,
+    "lr_min": 0.00020326181977670704,
+    "lr_decay": 4.0,
+    "momentum": 0.88
+}
