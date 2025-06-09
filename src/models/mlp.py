@@ -75,9 +75,9 @@ class BinaryClassificationMLP(nn.Module):
             MLPHyperparameters: Suggested hyperparameters for the MLP model.
         """
         mlp_layers = [
-            trial.suggest_categorical(f"mlp_hidden_dim_l{i}", [32, 64, 128, 256])
-            for i in range(2)
+            trial.suggest_categorical(f"mlp_hidden_dim_l0", [16, 32, 64]),
+            trial.suggest_categorical(f"mlp_hidden_dim_l1", [64, 128]),
         ]
-        p_dropout = trial.suggest_float("mlp_dropout_p", 0.0, 0.5, step=0.1)
+        p_dropout = trial.suggest_categorical("mlp_dropout_p", [0.2])
         
         return MLPHyperparameters(mlp_layers=mlp_layers, p_dropout=p_dropout)

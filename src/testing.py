@@ -2,7 +2,7 @@ from datasets.adult import AdultDataset
 from mechanisms.dpsgd import DPSGDHyperparameters, DPSGDMechanism
 from mechanisms.agt_ss import AGTHyperparameters, AGTMechanism
 from models.mlp import BinaryClassificationMLP, MLPHyperparameters
-from models.agt_mlp import AGTBCMLP
+from models.agt_mlp import AGTBCMLP, AGTBCMLPHyperparameters
 from util.privacy import PrivacyBudget
 
 print("Hello World!")
@@ -11,9 +11,8 @@ dataset = AdultDataset()
 
 print(f"Loaded dataset with n_features: {dataset.n_features}")
 
-model_hyperparams = MLPHyperparameters(
+model_hyperparams = AGTBCMLPHyperparameters(
     mlp_layers=[32, 128],
-    p_dropout=0.1,
 )
 
 print("Model Hyperparameters set")
@@ -30,11 +29,11 @@ mechanism = AGTMechanism(model_constructor, dataset)
 print("Initialised Mechanism")
 
 hyperparams = AGTHyperparameters(
-    learning_rate=0.03,
-    n_epochs=5,
-    batch_size=8192,
-    patience=30,
-    clip_gamma=0.1,
+    learning_rate=0.15,
+    n_epochs=10,
+    batch_size=40000,
+    patience=1000,
+    clip_gamma=0.06,
 )
  
 print("Mechanism Hyperparameters set")

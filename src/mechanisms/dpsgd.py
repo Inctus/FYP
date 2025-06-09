@@ -285,7 +285,6 @@ class DPSGDMechanism(DPLearningMechanism):
         best_model_state = None
         
         print("\nStarting DP-SGD training...")
-        print("Note: DP training is typically slower due to per-sample gradient computation")
         
         # Training loop
         for epoch in range(hyperparameters.n_epochs):
@@ -394,11 +393,11 @@ class DPSGDMechanism(DPLearningMechanism):
         Args:
             trial (optuna.Trial): The Optuna trial object used for hyperparameter optimization.
         """
-        n_epochs = trial.suggest_int("num_epochs", 20, 60, step=10)
-        learning_rate = trial.suggest_float("learning_rate", 1e-4, 1e-1, log=True)
-        batch_size = trial.suggest_categorical("batch_size",  [256, 512, 1024])
-        patience = trial.suggest_int("patience", 30, 60, step=5)
-        max_grad_norm = trial.suggest_float("max_grad_norm", 0.1, 7.0, log=True)
+        n_epochs = trial.suggest_int("num_epochs", 50, 70, step=5)
+        learning_rate = trial.suggest_float("learning_rate", 1e-3, 2e-1, log=True)
+        batch_size = trial.suggest_categorical("batch_size",  [256, 512, 1024, 2048])
+        patience = trial.suggest_int("patience", 20, 40, step=10)
+        max_grad_norm = trial.suggest_float("max_grad_norm", 0.1, 5.0)
 
         return DPSGDHyperparameters(
             n_epochs=n_epochs,

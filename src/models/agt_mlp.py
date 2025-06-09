@@ -1,12 +1,17 @@
-
-import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 import optuna
+
 from dataclasses import dataclass
 
-from models.mlp import MLPHyperparameters
+@dataclass
+class AGTBCMLPHyperparameters:
+    """
+    Hyperparameters for the AGTBCMLP model.
+    
+    Inherits from MLPHyperparameters and can be extended with additional parameters specific to AGTBCMLP.
+    """
+    mlp_layers: list
 
 
 class AGTBCMLP(nn.Sequential):
@@ -15,7 +20,7 @@ class AGTBCMLP(nn.Sequential):
     
     This class extends `nn.Sequential` to create a flexible MLP architecture based on the provided hyperparameters.
     """
-    def __init__(self, n_features: int, hyperparameters: MLPHyperparameters):
+    def __init__(self, n_features: int, hyperparameters: AGTBCMLPHyperparameters):
         layers = []
         input_dim = n_features
         
@@ -23,7 +28,6 @@ class AGTBCMLP(nn.Sequential):
         for layer_size in hyperparameters.mlp_layers:
             layers.append(nn.Linear(input_dim, layer_size))
             layers.append(nn.ReLU())
-            layers.append(nn.Dropout(hyperparameters.p_dropout))
             input_dim = layer_size
         
         # Output layer
@@ -32,7 +36,7 @@ class AGTBCMLP(nn.Sequential):
         super().__init__(*layers)
 
     @staticmethod
-    def suggest_hyperparameters(trial: optuna.Trial) -> MLPHyperparameters:
+    def suggest_hyperparameters(trial: optuna.Trial) -> AGTBCMLPHyperparameters:
         """
         Suggest hyperparameters for the MLP model using Optuna.
         
@@ -42,10 +46,7 @@ class AGTBCMLP(nn.Sequential):
         Returns:
             MLPHyperparameters: Suggested hyperparameters for the MLP model.
         """
-        mlp_layers = [
-            trial.suggest_categorical(f"mlp_hidden_dim_l{i}", [32, 64, 128, 256])
-            for i in range(2)
-        ]
-        p_dropout = trial.suggest_float("p_dropout", 0.0, 0.2)
+        mlp_layer_0 = trial.suggest_categorical("mlp_layer_0", [32, 128, 256])
+        mlp_layer_1 = trial.suggest_categorical("mlp_layer_1", [16, 32, 128])
         
-        return MLPHyperparameters(mlp_layers=mlp_layers, p_dropout=p_dropout)
+        return AGTBCMLPHyperparameters(mlp_layers=[mlp_layer_0, mlp_layer_1])

@@ -7,6 +7,7 @@ from mechanisms.mechanism import BaseMechanism, DPLearningMechanism
 from datasets.dataset import BaseDataset
 
 from util.constants import HYPERPARAMETER_RESULTS_DIR
+from util.privacy import PrivacyBudget
 
 
 class HyperparameterTuner:
@@ -14,7 +15,7 @@ class HyperparameterTuner:
     A class to perform hyperparameter tuning for mechanisms using Optuna.
     It tunes both mechanism-specific hyperparameters and model architectural hyperparameters (specifically for MLP).
     """
-    def __init__(self, mechanism_class: Type[BaseMechanism], model_class, dataset: BaseDataset, device: str):
+    def __init__(self, mechanism_class: Type[BaseMechanism], model_class, dataset: BaseDataset, device: str, privacy_budget: PrivacyBudget = None):
         """
         Initializes the HyperparameterTuner.
 
@@ -30,6 +31,8 @@ class HyperparameterTuner:
         self.dataset = dataset
         self.device = device
         self.storage_base_dir = Path(HYPERPARAMETER_RESULTS_DIR)
+
+        self.privacy_budget = privacy_budget
 
     def objective(self, trial: optuna.Trial) -> float:
         """
@@ -60,10 +63,17 @@ class HyperparameterTuner:
         #    This tuner is designed for mechanisms with train(hyperparameters, device)
         try:
             # The train method should return TrainingResults
-            training_results = mechanism_instance.train(
-                hyperparameters=mechanism_train_hyperparams,
-                device=self.device
-            )
+            if self.privacy_budget:
+                training_results = mechanism_instance.train(
+                    hyperparameters=mechanism_train_hyperparams,
+                    privacy_budget=self.privacy_budget,
+                    device=self.device
+                )
+            else:
+                training_results = mechanism_instance.train(
+                    hyperparameters=mechanism_train_hyperparams,
+                    device=self.device,
+                )
             print(f"Trial {trial.number} results: {training_results}")
 
             accuracy = training_results.accuracy # Optuna will maximize this
@@ -74,7 +84,7 @@ class HyperparameterTuner:
 
         return accuracy
 
-    def tune(self, n_trials: int, study_name: str) -> Dict[str, Any]:
+    def tune(self, n_trials: int, study_name: str, adaptive: bool = True) -> Dict[str, Any]:
         """
         Runs the hyperparameter tuning process.
 
@@ -87,7 +97,13 @@ class HyperparameterTuner:
             A dictionary containing the best hyperparameters found.
         """
         # Create an Optuna study
-        study = optuna.create_study(direction="maximize", study_name=study_name)
+        if not adaptive:
+            # Use the default sampler if not adaptive
+            sampler = optuna.samplers.RandomSampler()
+        else:
+            sampler = optuna.samplers.TPESampler()
+
+        study = optuna.create_study(direction="maximize", study_name=study_name, sampler=sampler)
 
         # Start optimization
         study.optimize(self.objective, n_trials=n_trials)
