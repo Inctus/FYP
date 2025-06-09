@@ -6,18 +6,7 @@ import torch.nn.functional as F
 import optuna
 from dataclasses import dataclass
 
-
-@dataclass
-class MLPHyperparameters:
-    """
-    Represents the hyperparameters for the MLP model.
-    
-    Attributes:
-        mlp_layers (list): List of integers representing the number of neurons in each hidden layer.
-        p_dropout (float): Dropout probability for regularization.
-    """
-    mlp_layers: list
-    p_dropout: float
+from models.mlp import MLPHyperparameters
 
 
 class AGTBCMLP(nn.Sequential):

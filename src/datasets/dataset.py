@@ -21,12 +21,11 @@ class FairnessDataset(TorchDataset):
             labels_np: NumPy array of labels.
             protected_attrs_np: Optional NumPy array of protected attributes.
         """
-        self.features = torch.tensor(features_np, dtype=torch.float32)
-        # Ensure labels are float32 for losses like BCELoss
-        self.labels = torch.tensor(labels_np, dtype=torch.float32) 
-        
+        self.features = torch.tensor(features_np, dtype=torch.float64)
+        self.labels = torch.tensor(labels_np, dtype=torch.float64)
+
         if protected_attrs_np is not None:
-            self.protected_attrs = torch.tensor(protected_attrs_np, dtype=torch.float32)
+            self.protected_attrs = torch.tensor(protected_attrs_np, dtype=torch.float64)
         else:
             self.protected_attrs = None
     

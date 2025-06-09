@@ -70,9 +70,9 @@ def main():
         privacy_budget = None
     
     if privacy_budget:
-        study_name = f"{args.dataset_name}_{args.mechanism}_tuning_eps{args.eps}_delta{args.delta}"
+        study_name = f"{args.dataset_name}_{args.mechanism}_eps{args.eps}_delta{args.delta}"
     else:
-        study_name = f"{args.dataset_name}_{args.mechanism}_tuning"
+        study_name = f"{args.dataset_name}_{args.mechanism}"
 
     tuner = HyperparameterTuner(
         mechanism_class=MECHANISM_CHOICES[args.mechanism],
@@ -84,7 +84,7 @@ def main():
 
     print(f"Starting tuning with study name: {study_name}")
     tuner.tune(
-        n_trials=50,  # You might want to make this configurable too
+        n_trials=200,  # You might want to make this configurable too
         study_name=study_name
     )
     print(f"Finished tuning for {study_name}")

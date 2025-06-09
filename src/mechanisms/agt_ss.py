@@ -38,13 +38,13 @@ class AGTMechanism(DPPredictionMechanism):
         print(f"AGT Mechanism initialized with k_values={self.k_values}")
 
     def train(self, hyperparameters: AGTHyperparameters, device: str):
-        model = self.model_constructor()
+        model = self.model_constructor().double().to(device)
 
         config = agt.AGTConfig(
             learning_rate=hyperparameters.learning_rate,
             n_epochs=hyperparameters.n_epochs,
-            loss="cross_entropy",
-            log_level="WARNING",
+            loss="binary_cross_entropy",
+            log_level="INFO",
             device=device,
             clip_gamma=hyperparameters.clip_gamma,
         )
@@ -63,10 +63,10 @@ class AGTMechanism(DPPredictionMechanism):
             self.bounded_model_dict[k_private] = bounded_model
             
             # as a metric, compute the number of predictions in the test set certified at this value of k_private
-            certified_preds = agt.test_metrics.certified_predictions(bounded_model, test_dataset) # TODO: Amend this if it works haha it is meant
+            certified_preds = agt.test_metrics.certified_predictions(bounded_model, test_dataset.features)
             print(f"Certified Predictions at k={k_private}: {certified_preds:.2f}")
 
-        noise_free_val_acc_l = agt.test_metrics.test_accuracy(self.bounded_model_dict[0], val_dataset)[0]
+        noise_free_val_acc_l = agt.test_metrics.test_accuracy(self.bounded_model_dict[0], val_dataset.features, val_dataset.labels)[0]
 
         return TrainingResults(
             accuracy= noise_free_val_acc_l,
