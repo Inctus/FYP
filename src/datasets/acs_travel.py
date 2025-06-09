@@ -40,13 +40,8 @@ class ACSTravelTimeDataset(BaseDataset):
             # Consider adding a more robust check or instruction.
             print(f"Warning: Folktables data path {FOLKTABLES_DATA_PATH} does not exist. "
                   "Data loading might fail as download_data is False.")
-        
-        self.features_dim = None # Will be populated after load_data
 
         super().__init__() # Calls BaseDataset.__init__ -> self.load_data()
-        
-        if self._aif360_dataset_original:
-            self.features_dim = self._aif360_dataset_original.features.shape[1]
 
     def load_data(self) -> StandardDataset:
         """
@@ -87,22 +82,33 @@ class ACSTravelTimeDataset(BaseDataset):
         # ACSTravelTime.features: ['AGEP', 'SCHL', 'MAR', 'SEX', 'DIS', 'ESP', 'MIG', 'RELP', 'RAC1P', 'PUMA', 'ST', 'CIT', 'OCCP', 'JWTR', 'POWPUMA', 'POVPIP']
         # 'SEX' is the protected attribute. Other categorical features need one-hot encoding.
         categorical_features_for_encoding = ["SCHL", "MAR", "DIS", "ESP", "MIG", "RELP", "RAC1P", "PUMA", "ST", "CIT", "OCCP", "JWTR", "POWPUMA"]
-        # Ensure all columns exist
-        all_expected_cols = categorical_features_for_encoding + protected_attribute_names + ['AGEP', 'POVPIP']
-        for col in all_expected_cols:
+        for col in categorical_features_for_encoding:
             if col not in df.columns:
-                raise ValueError(f"Expected column '{col}' not found in ACSTravelTime features for the given configuration.")
+                raise ValueError(f"Expected column '{col}' not found in data.")
+            # Determine top 10 categories by frequency
+            top_cats = df[col].value_counts().nlargest(10).index
+            
+            for cat in top_cats:
+                new_col = f"{col}_{cat}"
+                df[new_col] = (df[col] == cat).astype(float)
+            # Drop original column
+            df.drop(columns=col, inplace=True)
+
+        # Verify required numeric and protected columns exist
+        for col in ['AGEP', 'POVPIP'] + protected_attribute_names + [label_name]:
+            if col not in df.columns:
+                raise ValueError(f"Expected column '{col}' missing after encoding.")
 
         default_metadata = self._get_default_metadata()
 
         dataset = StandardDataset(
-            df=df,
+            df=df.copy(), # To Defrag it
             label_name=label_name,
             favorable_classes=favorable_classes,
             protected_attribute_names=protected_attribute_names,
             privileged_classes=privileged_classes,
             instance_weights_name=None,
-            categorical_features=categorical_features_for_encoding,
+            categorical_features=[],
             features_to_keep=[], 
             features_to_drop=[],
             na_values=[], 

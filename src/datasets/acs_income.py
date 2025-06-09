@@ -87,9 +87,20 @@ class ACSIncomeDataset(BaseDataset):
         # ACSIncome.features: ['AGEP', 'COW', 'SCHL', 'MAR', 'OCCP', 'POBP', 'RELP', 'WKHP', 'SEX', 'RAC1P']
         # 'SEX' is the protected attribute. 'RAC1P' will be a regular categorical feature.
         categorical_features_for_encoding = ['COW', 'SCHL', 'MAR', 'OCCP', 'POBP', 'RELP', 'RAC1P']
+        for col in categorical_features_for_encoding:
+            if col not in df.columns:
+                raise ValueError(f"Expected column '{col}' not found in data.")
+            # Determine top 10 categories by frequency
+            top_cats = df[col].value_counts().nlargest(15).index
+            
+            for cat in top_cats:
+                new_col = f"{col}_{cat}"
+                df[new_col] = (df[col] == cat).astype(float)
+            # Drop original column
+            df.drop(columns=col, inplace=True)
         
         # Ensure all columns exist
-        all_expected_cols = categorical_features_for_encoding + protected_attribute_names + ['AGEP', 'WKHP']
+        all_expected_cols = protected_attribute_names + ['AGEP', 'WKHP']
         for col in all_expected_cols:
             if col not in df.columns:
                 raise ValueError(f"Expected column '{col}' not found in ACSIncome features for the given configuration.")
@@ -103,7 +114,7 @@ class ACSIncomeDataset(BaseDataset):
             protected_attribute_names=protected_attribute_names,
             privileged_classes=privileged_classes,
             instance_weights_name=None,
-            categorical_features=categorical_features_for_encoding,
+            categorical_features=[],
             features_to_keep=[], 
             features_to_drop=[],
             na_values=[], 
