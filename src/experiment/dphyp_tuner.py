@@ -1,56 +1,37 @@
 
 import math
-from typing import Tuple, List
+from typing import Tuple
 
-def per_run_budget_rdp(target_eps: float,
-                       target_delta: float,
-                       gamma: float,
-                       delta_run: float | None = None,
-                       alphas: List[float] | None = None,
-                       tol: float = 1e-6,
-                       max_iter: int = 100) -> Tuple[float, float]:
+
+def per_run_budget(
+    *,
+    target_eps: float,
+    target_delta: float,
+    gamma: float,
+) -> Tuple[float, float]:
     """
-    Allocate a per-run (ε_run, δ_run) so that the *whole*
-    best-of-K routine (K ~ logarithmic, η = 0) satisfies
-    (target_eps, target_delta)-DP            - Theorem 2, η = 0.
+    Closed‑form allocation when each trial is treated as a *pure‑DP* mechanism
+    and K ~ logarithmic(γ) with η = 0 (Corollary 3 in the paper).
+
+    overall ε = (2)·ε_run
+    overall δ = δ_run · E[K]
 
     Returns
     -------
-    eps_run, delta_run
+    eps_run   : ε every trial may spend
+    delta_run : δ every trial may spend
     """
-    if delta_run is None:
-        delta_run = target_delta
+    if not (0 < gamma < 1):
+        raise ValueError("γ must lie in (0, 1)")
 
-    # Opacus’ default RDP α-grid (1.1, 1.2, …, 10.0, 12, …, 63)
-    if alphas is None:
-        alphas = [1 + x / 10 for x in range(1, 100)] + list(range(12, 64))
+    # Mean of logarithmic (η = 0) series
+    log1g = math.log(1.0 / gamma)
+    EK    = (1.0 / gamma - 1.0) / log1g
 
-    log1g = math.log(1 / gamma)
-    EK    = (1 / gamma - 1) / log1g           # mean of log-series
+    eps_run   = target_eps / 2.0
+    delta_run = target_delta / max(EK, 1.0)
 
-    def overall_eps(eps_run: float) -> float:
-        best = float("inf")
-        for lam in alphas:
-            if lam <= 1:
-                continue
-            # Theorem 2: add γ-dependent RDP penalties
-            eps_total_rdp = eps_run + log1g / lam + math.log(EK) / (lam - 1)
-            # RDP → (ε,δ)  (Mironov 2017, Lemma 3)
-            eps_dp = eps_total_rdp + math.log(1 / target_delta) / (lam - 1)
-            best = min(best, eps_dp)
-        return best
-
-    # binary-search for the largest ε_run that keeps overall ε ≤ target_eps
-    lo, hi = 1e-6, target_eps
-    for _ in range(max_iter):
-        mid = (lo + hi) / 2
-        if overall_eps(mid) > target_eps:
-            hi = mid
-        else:
-            lo = mid
-        if hi - lo < tol:
-            break
-    return (lo + hi) / 2, delta_run
+    return eps_run, delta_run
 
 import optuna
 import json
@@ -78,10 +59,12 @@ class DPHyperparameterTuner:
     """
     def __init__(self,
                  mechanism_class: DPLearningMechanism,
+                 model_class,
                  dataset: BaseDataset,
                  device: str,
                  privacy_budget: PrivacyBudget):
         self.mechanism_class   = mechanism_class
+        self.model_class       = model_class
         self.dataset           = dataset
         self.device            = device
         self.storage_base_dir  = Path(HYPERPARAMETER_RESULTS_DIR)
@@ -100,24 +83,36 @@ class DPHyperparameterTuner:
             k = MAX_TRIALS
         elif k < 1:
             raise ValueError(f"Sampled n_trials {k} < 1.  Check γ or MAX_TRIALS.")
+        else:
+            print(f"Sampled n_trials: {k} (γ = {gamma})")
         return k
 
     def _set_per_run_budget(self, gamma: float):
         """Compute and cache the per-run PrivacyBudget for this sweep."""
-        eps_run, delta_run = per_run_budget_rdp(
+        eps_run, delta_run = per_run_budget(
             target_eps   = self.global_privacy_budget.epsilon,
             target_delta = self.global_privacy_budget.delta,
             gamma        = gamma,
         )
-        print(f"Per-run budget: ε = {eps_run:.4f}, δ = {delta_run}")
+        print(f"Per-run budget: ε = {eps_run:.4f}, δ = {delta_run:.2e}")
         self.privacy_budget = PrivacyBudget(epsilon=eps_run, delta=delta_run)
 
     def objective(self, trial: optuna.Trial) -> float:
         """One Optuna trial under the *per-run* DP budget."""
         if self.privacy_budget is None:
             raise RuntimeError("Per-run privacy budget not initialised.")
+        
+         # 1. Suggest model architectural hyperparameters
+        model_arch_params = self.model_class.suggest_hyperparameters(trial)
 
-        mechanism_instance = self.mechanism_class(dataset=self.dataset)
+        # 2. Create model constructor with these trial parameters
+        #    Input and output dimensions are determined by the dataset.
+        input_dim = self.dataset.n_features
+
+        def model_constructor_with_trial_params():
+            return self.model_class(input_dim, model_arch_params)
+
+        mechanism_instance = self.mechanism_class(model_constructor_with_trial_params, dataset=self.dataset)
         mechanism_hparams  = mechanism_instance.suggest_hyperparameters(trial)
 
         try:

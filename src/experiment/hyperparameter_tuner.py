@@ -25,9 +25,6 @@ class HyperparameterTuner:
             dataset: The dataset instance to use for training and evaluation.
             device: The device to use for training (e.g., "cuda" or "cpu").
         """
-        assert(not issubclass(mechanism_class, DPLearningMechanism), \
-            "This tuner is not designed for DPLearningMechanism. Use a different tuner for learning mechanisms.")
-
         self.mechanism_class = mechanism_class
         self.model_class = model_class
         self.dataset = dataset

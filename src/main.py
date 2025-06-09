@@ -9,6 +9,7 @@ from mechanisms.dpsgd import DPSGDMechanism
 from models.mlp import BinaryClassificationMLP
 
 from experiment.hyperparameter_tuner import HyperparameterTuner
+from experiment.dphyp_tuner import DPHyperparameterTuner
 
 DATASET_CHOICES = {
     "adult": AdultDataset,
@@ -74,19 +75,31 @@ def main():
     else:
         study_name = f"{args.dataset_name}_{args.mechanism}"
 
-    tuner = HyperparameterTuner(
-        mechanism_class=MECHANISM_CHOICES[args.mechanism],
-        model_class=BinaryClassificationMLP,
-        dataset=dataset,
-        device=args.device,  # Use the device specified in the command line arguments
-        privacy_budget=privacy_budget
-    )
 
     print(f"Starting tuning with study name: {study_name}")
-    tuner.tune(
-        n_trials=200,  # You might want to make this configurable too
-        study_name=study_name
-    )
+
+    if args.mechanism == "dpsgd":
+        tuner = DPHyperparameterTuner(
+            mechanism_class=MECHANISM_CHOICES[args.mechanism],
+            model_class=BinaryClassificationMLP,
+            dataset=dataset,
+            device=args.device,  # Use the device specified in the command line arguments
+            privacy_budget=privacy_budget
+        )
+
+        tuner.tune(0.1, study_name)
+    else:
+        tuner = HyperparameterTuner(
+            mechanism_class=MECHANISM_CHOICES[args.mechanism],
+            model_class=BinaryClassificationMLP,
+            dataset=dataset,
+            device=args.device,  # Use the device specified in the command line arguments
+        )
+        tuner.tune(
+            n_trials=200,  # You might want to make this configurable too
+            study_name=study_name
+        )
+    
     print(f"Finished tuning for {study_name}")
 
 if __name__ == "__main__":
