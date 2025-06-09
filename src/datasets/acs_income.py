@@ -5,6 +5,7 @@ from aif360.datasets import StandardDataset
 from datasets.dataset import BaseDataset # Assuming this is in the parent directory or PYTHONPATH
 from util.constants import FOLKTABLES_DATA_PATH
 
+import pandas as pd
 
 class ACSIncomeDataset(BaseDataset):
     """
@@ -67,6 +68,13 @@ class ACSIncomeDataset(BaseDataset):
             raise
 
         features_df, labels_series, _ = ACSIncome.df_to_pandas(acs_data)
+
+        # Print imbalance in labels
+        print("Label distribution:")
+        print(labels_series.value_counts(normalize=True))
+        print("Label imbalance (should be around 0.5 for balanced data):")
+        print(labels_series.value_counts(normalize=True).get(1, 0.0),
+                labels_series.value_counts(normalize=True).get(0, 0.0))
         
         df = features_df.copy()
         # We need to map from Folktables to AIF360's expected format:
@@ -87,18 +95,40 @@ class ACSIncomeDataset(BaseDataset):
         # ACSIncome.features: ['AGEP', 'COW', 'SCHL', 'MAR', 'OCCP', 'POBP', 'RELP', 'WKHP', 'SEX', 'RAC1P']
         # 'SEX' is the protected attribute. 'RAC1P' will be a regular categorical feature.
         categorical_features_for_encoding = ['COW', 'SCHL', 'MAR', 'OCCP', 'POBP', 'RELP', 'RAC1P']
-        for col in categorical_features_for_encoding:
-            if col not in df.columns:
-                raise ValueError(f"Expected column '{col}' not found in data.")
-            # Determine top 10 categories by frequency
-            top_cats = df[col].value_counts().nlargest(15).index
+        new_ohe_columns_data = {} # Dictionary to hold new column Series
+
+        for col_name in categorical_features_for_encoding:
+            if col_name not in df.columns: # Check if original column exists
+                # This check was already there, good for robustness
+                raise ValueError(f"Expected categorical column '{col_name}' not found in data.")
             
-            for cat in top_cats:
-                new_col = f"{col}_{cat}"
-                df[new_col] = (df[col] == cat).astype(float)
-            # Drop original column
-            df.drop(columns=col, inplace=True)
-        
+            original_series = df[col_name] # Get the original column Series
+            top_cats = original_series.value_counts().nlargest(20).index
+            
+            for cat_value in top_cats:
+                print(f"OHE category '{cat_value}' for column '{col_name}'")
+                new_ohe_col_name = f"{col_name}_{cat_value}"
+                new_ohe_columns_data[new_ohe_col_name] = (original_series == cat_value).astype(float)
+            
+            other_series_mask = ~original_series.isin(top_cats)
+            if other_series_mask.any(): # Check if any row falls into the 'other' category
+                other_col_name = f"{col_name}_other"
+                new_ohe_columns_data[other_col_name] = other_series_mask.astype(float)
+                print(f"Created 'other' category for column '{col_name}' with {other_series_mask.sum()} entries.")
+            else:
+                print(f"No 'other' category needed for column '{col_name}' as all values are in top 20.")
+
+        # Create a new DataFrame from all the generated OHE columns
+        if new_ohe_columns_data: # Check if any OHE columns were generated
+            df_ohe_new = pd.DataFrame(new_ohe_columns_data, index=df.index)
+
+            # Drop the original categorical columns that were encoded
+            df.drop(columns=categorical_features_for_encoding, inplace=True)
+
+            # Concatenate the original DataFrame (now without raw categorical features) 
+            # with the new DataFrame of OHE features
+            df = pd.concat([df, df_ohe_new], axis=1)
+            
         # Ensure all columns exist
         all_expected_cols = protected_attribute_names + ['AGEP', 'WKHP']
         for col in all_expected_cols:
@@ -106,6 +136,8 @@ class ACSIncomeDataset(BaseDataset):
                 raise ValueError(f"Expected column '{col}' not found in ACSIncome features for the given configuration.")
 
         default_metadata = self._get_default_metadata()
+
+        print(df.columns)
 
         dataset = StandardDataset(
             df=df,

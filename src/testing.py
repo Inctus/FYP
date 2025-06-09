@@ -1,5 +1,8 @@
 from datasets.adult import AdultDataset
+from datasets.acs_income import ACSIncomeDataset
+from datasets.acs_travel import ACSTravelTimeDataset
 from mechanisms.dpsgd import DPSGDHyperparameters, DPSGDMechanism
+from mechanisms.sgd import SGDMechanism, BaseHyperparameters
 from mechanisms.agt_ss import AGTHyperparameters, AGTMechanism
 from models.mlp import BinaryClassificationMLP, MLPHyperparameters
 from models.agt_mlp import AGTBCMLP, AGTBCMLPHyperparameters
@@ -7,33 +10,36 @@ from util.privacy import PrivacyBudget
 
 print("Hello World!")
 
-dataset = AdultDataset()
+dataset = ACSTravelTimeDataset()
 
 print(f"Loaded dataset with n_features: {dataset.n_features}")
 
-model_hyperparams = AGTBCMLPHyperparameters(
-    mlp_layers=[32, 128],
+model_hyperparams = MLPHyperparameters(
+    mlp_layers=[512, 128],
+    p_dropout=0.5,
 )
 
 print("Model Hyperparameters set")
 
-model_constructor = lambda: AGTBCMLP(
+model_constructor = lambda: BinaryClassificationMLP(
     n_features=dataset.n_features,
     hyperparameters=model_hyperparams
 )
 
 print("Created model constructor")
 
-mechanism = AGTMechanism(model_constructor, dataset)
+mechanism = SGDMechanism(
+    model_constructor=model_constructor,
+    dataset=dataset,
+)
 
 print("Initialised Mechanism")
 
-hyperparams = AGTHyperparameters(
-    learning_rate=0.15,
-    n_epochs=10,
-    batch_size=40000,
-    patience=1000,
-    clip_gamma=0.06,
+hyperparams = BaseHyperparameters(
+    learning_rate=0.01,
+    n_epochs=100,
+    batch_size=256,
+    patience=50,
 )
  
 print("Mechanism Hyperparameters set")
