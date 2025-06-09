@@ -50,7 +50,7 @@ class AGTMechanism(DPPredictionMechanism):
         )
 
         # Prepare the dataset
-        train_dataset, val_dataset, test_dataset = self.dataset.to_torch()
+        train_dataset, val_dataset, test_dataset = self.dataset.to_torch(make_float64=True)
         dataloader_train = DataLoader(train_dataset, batch_size=hyperparameters.batch_size, shuffle=True)
         dataloader_val = DataLoader(val_dataset, batch_size=hyperparameters.batch_size, shuffle=False)
 

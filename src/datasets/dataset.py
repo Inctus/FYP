@@ -14,18 +14,25 @@ class FairnessDataset(TorchDataset):
     Data is expected to be in NumPy array format and will be converted to PyTorch tensors.
     """
     
-    def __init__(self, features_np: np.ndarray, labels_np: np.ndarray, protected_attrs_np: np.ndarray | None = None):
+    def __init__(self, features_np: np.ndarray, labels_np: np.ndarray, protected_attrs_np: np.ndarray | None = None, make_float64: bool = False):
         """
         Args:
             features_np: NumPy array of features.
             labels_np: NumPy array of labels.
             protected_attrs_np: Optional NumPy array of protected attributes.
         """
-        self.features = torch.tensor(features_np, dtype=torch.float64)
-        self.labels = torch.tensor(labels_np, dtype=torch.float64)
+        if make_float64:
+            self.features = torch.tensor(features_np, dtype=torch.float64)
+            self.labels = torch.tensor(labels_np, dtype=torch.float64)
+        else:
+            self.features = torch.tensor(features_np, dtype=torch.float32)
+            self.labels = torch.tensor(labels_np, dtype=torch.float32)
 
         if protected_attrs_np is not None:
-            self.protected_attrs = torch.tensor(protected_attrs_np, dtype=torch.float64)
+            if make_float64:
+                self.protected_attrs = torch.tensor(protected_attrs_np, dtype=torch.float64)
+            else:
+                self.protected_attrs = torch.tensor(protected_attrs_np, dtype=torch.float32)
         else:
             self.protected_attrs = None
     
@@ -67,7 +74,7 @@ class BaseDataset(ABC):
         """
         raise NotImplementedError("load_data() must be implemented in subclasses")
 
-    def to_torch(self) -> Tuple[FairnessDataset, FairnessDataset, FairnessDataset]:
+    def to_torch(self, make_float64: bool = False) -> Tuple[FairnessDataset, FairnessDataset, FairnessDataset]:
         """
         Processes the AIF360 dataset:
         1. Extracts features, labels, and (optionally) protected attributes.
@@ -144,9 +151,9 @@ class BaseDataset(ABC):
             X_test_np = scaler.transform(X_test_np)
 
         # 5. Create FairnessDataset instances
-        train_dataset = FairnessDataset(X_train_np, y_train_np)
-        val_dataset = FairnessDataset(X_val_np, y_val_np)
-        test_dataset = FairnessDataset(X_test_np, y_test_np, prot_test_np)
+        train_dataset = FairnessDataset(X_train_np, y_train_np, make_float64=make_float64)
+        val_dataset = FairnessDataset(X_val_np, y_val_np, make_float64=make_float64)
+        test_dataset = FairnessDataset(X_test_np, y_test_np, prot_test_np, make_float64=make_float64)
         
         print(f"Dataset sizes - Train: {len(train_dataset)}, Val: {len(val_dataset)}, Test: {len(test_dataset)}")
         
