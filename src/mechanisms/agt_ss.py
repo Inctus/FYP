@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import abstract_gradient_training as agt
 import optuna
-from mechanism import BaseHyperparameters, BaseMechanism, TrainingResults
+from mechanisms.mechanism import BaseHyperparameters, DPPredictionMechanism, TrainingResults
 from torch.utils.data import DataLoader
 
 from datasets.dataset import BaseDataset
@@ -25,18 +25,18 @@ class AGTHyperparameters(BaseHyperparameters):
     clip_gamma: float
 
 
-class AGTMechanism(BaseMechanism):
+class AGTMechanism(DPPredictionMechanism):
     """
     AGT (Abstract Gradient Training) Mechanism for Differentially Private Prediction.
     This mechanism is designed as a prediction-privacy mechanism.
     """
-    def __init__(self, model_constructor, dataset: BaseDataset, privacy_budget: PrivacyBudget):
-        super().__init__(model_constructor, dataset, privacy_budget)
+    def __init__(self, model_constructor, dataset: BaseDataset):
+        super().__init__(model_constructor, dataset)
         self.k_values = [0, 1, 10, 20, 50, 100] # TODO: Check how to derive these values from the dataset
         self.bounded_model_dict = {}  # Dictionary to store bounded models for each k value
 
-        print(f"AGT Mechanism initialized with k_values={self.k_values} and privacy budget: {self.privacy_budget}")
-    
+        print(f"AGT Mechanism initialized with k_values={self.k_values}")
+
     def train(self, hyperparameters: AGTHyperparameters, device: str):
         model = self.model_constructor()
 
@@ -74,7 +74,7 @@ class AGTMechanism(BaseMechanism):
             hyperparameters=hyperparameters,
         )
 
-    def predict(self, device: str):
+    def predict(self, device: str, privacy_budget: PrivacyBudget):
         raise NotImplementedError("AGT prediction not yet implemented.")
 
     def save(self, path: str):
@@ -98,9 +98,9 @@ class AGTMechanism(BaseMechanism):
             self.bounded_model_dict[k_private] = bounded_model
 
     def suggest_hyperparameters(self, trial: optuna.Trial):
-        learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True)
-        n_epochs = trial.suggest_int("n_epochs", 1, 100)
-        batch_size = trial.suggest_int("batch_size", 1, 64)
+        learning_rate = trial.suggest_float("learning_rate", 1e-4, 1e-1, log=True)
+        n_epochs = trial.suggest_int("n_epochs", 10, 80)
+        batch_size = trial.suggest_categorical("batch_size", [512, 1024, 2048, 4096, 8192])
         patience = trial.suggest_int("patience", 1, 10)
         clip_gamma = trial.suggest_float("clip_gamma", 0.0, 1.0)
 

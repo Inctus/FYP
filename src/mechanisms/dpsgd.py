@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import optuna
 import torch
 import torch.nn as nn
-from mechanism import BaseHyperparameters, BaseMechanism, TrainingResults
+from mechanisms.mechanism import BaseHyperparameters, DPLearningMechanism, TrainingResults
 # Opacus imports for differential privacy
 from opacus import PrivacyEngine
 from opacus.utils.batch_memory_manager import BatchMemoryManager
@@ -30,7 +30,7 @@ class DPSGDHyperparameters(BaseHyperparameters):
     max_grad_norm: float = 1.0  # Maximum gradient norm for clipping
 
 
-class DPSGDMechanism(BaseMechanism):
+class DPSGDMechanism(DPLearningMechanism):
     """
     A mechanism that trains a model using DP-SGD via the Opacus library.
     
@@ -38,9 +38,8 @@ class DPSGDMechanism(BaseMechanism):
     which tracks privacy expenditure across all training steps.
     """
     
-    def __init__(self, model_constructor, dataset: BaseDataset, privacy_budget: PrivacyBudget):
-        super().__init__(model_constructor, dataset, privacy_budget)
-        print(f"DPSGD Mechanism initialized with privacy budget: ε={privacy_budget.epsilon}, δ={privacy_budget.delta}")
+    def __init__(self, model_constructor, dataset: BaseDataset):
+        super().__init__(model_constructor, dataset)
     
     def _setup_model_and_device(self, device):
         """Initialize model and set device."""
@@ -60,7 +59,7 @@ class DPSGDMechanism(BaseMechanism):
     
     def _setup_data_loaders(self, hyperparameters: DPSGDHyperparameters):
         """Create data loaders with DP-specific requirements."""
-        train_dataset, val_dataset, test_dataset = self.dataset.to_torch(include_protected=False)
+        train_dataset, val_dataset, test_dataset = self.dataset.to_torch()
         
         # DP requires drop_last=True for consistent batch sizes, it drops the final incomplete batch
         # i.e. [[1, 2, 3], [4, 5, 6], [7, 8]] -> [[1, 2, 3], [4, 5, 6]]
@@ -100,9 +99,9 @@ class DPSGDMechanism(BaseMechanism):
         criterion = nn.BCELoss(reduction='none')  # No reduction for per-sample losses
         return optimizer, criterion
     
-    def _setup_privacy_engine(self, model, optimizer, train_loader, hyperparameters: DPSGDHyperparameters, epsilon, delta):
+    def _setup_privacy_engine(self, model, optimizer, train_loader, hyperparameters: DPSGDHyperparameters, epsilon, delta, criterion):
         """Initialize and configure the privacy engine."""
-        privacy_engine = PrivacyEngine()
+        privacy_engine = PrivacyEngine(accountant="rdp", secure_mode=False)
         
         # Transform model, optimizer, and data loader for DP
         model, optimizer, train_loader = privacy_engine.make_private_with_epsilon(
@@ -113,6 +112,7 @@ class DPSGDMechanism(BaseMechanism):
             target_epsilon=epsilon,
             target_delta=delta,
             max_grad_norm=hyperparameters.max_grad_norm,
+            criterion=criterion,
         )
         
         self._log_privacy_setup(privacy_engine, optimizer)
@@ -250,7 +250,7 @@ class DPSGDMechanism(BaseMechanism):
 
         return val_accuracy
 
-    def train(self, hyperparameters: DPSGDHyperparameters, device: str) -> TrainingResults:
+    def train(self, hyperparameters: DPSGDHyperparameters, privacy_budget: PrivacyBudget, device: str) -> TrainingResults:
         """
         Trains the model using DP-SGD.
 
@@ -262,14 +262,14 @@ class DPSGDMechanism(BaseMechanism):
         """
         # Setup phase
         model, device = self._setup_model_and_device(device)
-        epsilon, delta = self.privacy_budget.epsilon, self.privacy_budget.delta
+        epsilon, delta = privacy_budget.epsilon, privacy_budget.delta
         train_loader, val_loader = self._setup_data_loaders(hyperparameters)
         
         # Model validation and DP setup
         model = self._validate_model_for_opacus(model)
         optimizer, criterion = self._setup_optimizer_and_criterion(model, hyperparameters.learning_rate)
         privacy_engine, model, optimizer, train_loader = self._setup_privacy_engine(
-            model, optimizer, train_loader, hyperparameters, epsilon, delta
+            model, optimizer, train_loader, hyperparameters, epsilon, delta, criterion
         )
         
         # Training tracking variables
@@ -334,7 +334,7 @@ class DPSGDMechanism(BaseMechanism):
         self._log_final_privacy_stats(privacy_engine, delta, epsilon)
         
         # Final evaluation
-        _, val_dataset, _ = self.dataset.to_torch(include_protected=False)
+        _, val_dataset, _ = self.dataset.to_torch()
         val_accuracy = self._evaluate_final_model_dp(model, val_dataset, device, hyperparameters.batch_size)
 
         # Save trained model
@@ -352,7 +352,7 @@ class DPSGDMechanism(BaseMechanism):
         Returns:
             List of prediction probabilities.
         """
-        _, _, test_dataset = self.dataset.to_torch(include_protected=False)
+        _, _, test_dataset = self.dataset.to_torch()
         test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
         
         self.model.eval()
@@ -394,10 +394,10 @@ class DPSGDMechanism(BaseMechanism):
         Args:
             trial (optuna.Trial): The Optuna trial object used for hyperparameter optimization.
         """
-        n_epochs = trial.suggest_int("num_epochs", 50, 200, step=10)
-        learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
-        batch_size = trial.suggest_categorical("batch_size",  [32, 64, 128, 256, 512])
-        patience = trial.suggest_int("patience", 5, 30, step=5)
+        n_epochs = trial.suggest_int("num_epochs", 10, 60, step=10)
+        learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True)
+        batch_size = trial.suggest_categorical("batch_size",  [128, 256, 512, 1024])
+        patience = trial.suggest_int("patience", 30, 60, step=5)
         max_grad_norm = trial.suggest_float("max_grad_norm", 0.1, 5.0, log=True)
 
         return DPSGDHyperparameters(

@@ -280,7 +280,7 @@ class SGDMechanism(BaseMechanism):
         """
         n_epochs = trial.suggest_int("n_epochs", 10, 100)
         learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True)
-        batch_size = trial.suggest_categorical("batch_size", [16, 32, 64])
+        batch_size = trial.suggest_categorical("batch_size", [64, 128, 256, 512])
         patience = trial.suggest_int("patience", 5, 20)
         
         return BaseHyperparameters(

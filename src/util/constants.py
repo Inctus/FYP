@@ -16,4 +16,4 @@ assert TRAIN_SPLIT + VAL_SPLIT + TEST_SPLIT == 1.0, \
 FOLKTABLES_DATA_PATH = "/vol/bitbucket/hh2721/folktables"
 
 # Hyperparameter results directory
-HYPERPARAMETER_RESULTS_DIR = "hyperparameter_results"
+HYPERPARAMETER_RESULTS_DIR = "/homes/hh2721/fyp/haashim_repo/hyperparameter_results"

@@ -1,20 +1,20 @@
 import optuna
 import json
 from pathlib import Path
-from typing import Type, Dict, Any
+from typing import Type, Dict, Any, Optional
 
 from mechanisms.mechanism import BaseMechanism, DPLearningMechanism
-from models.mlp import BinaryClassificationMLP # Assuming MLP is a common model to tune
 from datasets.dataset import BaseDataset
 
 from util.constants import HYPERPARAMETER_RESULTS_DIR
+from util.privacy import PrivacyBudget
 
 class HyperparameterTuner:
     """
     A class to perform hyperparameter tuning for mechanisms using Optuna.
     It tunes both mechanism-specific hyperparameters and model architectural hyperparameters (specifically for MLP).
     """
-    def __init__(self, mechanism_class: Type[BaseMechanism], model_class: Type[BinaryClassificationMLP], dataset: BaseDataset, device: str):
+    def __init__(self, mechanism_class: Type[BaseMechanism], model_class, dataset: BaseDataset, device: str, privacy_budget: Optional[PrivacyBudget] = None):
         """
         Initializes the HyperparameterTuner.
 
@@ -30,9 +30,10 @@ class HyperparameterTuner:
         self.dataset = dataset
         self.device = device
         self.storage_base_dir = Path(HYPERPARAMETER_RESULTS_DIR)
+        self.privacy_budget = privacy_budget
 
-        assert(isinstance(mechanism_class, BaseMechanism), "BaseMechanism is required for mechanism_class")
-        assert(not isinstance(mechanism_class, DPLearningMechanism), "DPLearningMechanism is not supported by this tuner")
+        if issubclass(mechanism_class, DPLearningMechanism) and not privacy_budget:
+            raise ValueError("DPLearningMechanism requires a privacy budget. Please provide a PrivacyBudget instance.")
 
     def objective(self, trial: optuna.Trial) -> float:
         """
@@ -63,11 +64,18 @@ class HyperparameterTuner:
         #    This tuner is designed for mechanisms with train(hyperparameters, device)
         try:
             # The train method should return TrainingResults
-            training_results = mechanism_instance.train(
-                hyperparameters=mechanism_train_hyperparams,
-                device=self.device
-            )
-            print(f"Trial {trial.number} results: {training_results}") 
+            if self.privacy_budget:
+                training_results = mechanism_instance.train(
+                    hyperparameters=mechanism_train_hyperparams,
+                    privacy_budget=self.privacy_budget,
+                    device=self.device,
+                )
+            else:
+                training_results = mechanism_instance.train(
+                    hyperparameters=mechanism_train_hyperparams,
+                    device=self.device
+                )
+            print(f"Trial {trial.number} results: {training_results}")
 
             accuracy = training_results.accuracy # Optuna will maximize this
         except Exception as e:
@@ -114,7 +122,7 @@ class HyperparameterTuner:
         self.storage_base_dir.mkdir(parents=True, exist_ok=True)
 
         # Include study_name in filename to distinguish different tuning runs if needed
-        save_path = self.storage_base_dir / f"best_hyperparameters_{study_name}.json"
+        save_path = self.storage_base_dir / f"{study_name}.json"
         with open(save_path, 'w') as f:
             json.dump(hyperparams, f, indent=4)
         print(f"Best hyperparameters saved to {save_path}")
