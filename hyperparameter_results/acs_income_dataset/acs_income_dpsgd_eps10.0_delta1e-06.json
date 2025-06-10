@@ -1,0 +1,10 @@
+{
+    "mlp_hidden_dim_l0": 64,
+    "mlp_hidden_dim_l1": 128,
+    "mlp_dropout_p": 0.2,
+    "num_epochs": 60,
+    "learning_rate": 0.025005381320260426,
+    "batch_size": 512,
+    "patience": 20,
+    "max_grad_norm": 2.3460802974495154
+}
