@@ -356,14 +356,18 @@ class DPSGDMechanism(DPLearningMechanism):
         
         self.model.eval()
         predictions = []
+        true_labels = []
+        protected_attrs = []
         
         with torch.no_grad():
-            for batch_X, _ in test_loader:
+            for batch_X, label, protected_attr in test_loader:
                 batch_X = batch_X.to(device)
                 _, outputs = self.model(batch_X)
                 predictions.extend(outputs.squeeze().cpu().numpy().tolist())
+                true_labels.extend(label.squeeze().cpu().numpy().tolist())
+                protected_attrs.extend(protected_attr.squeeze().cpu().numpy().tolist())
         
-        return predictions
+        return predictions, true_labels, protected_attrs
     
     def save(self, path: str):
         """

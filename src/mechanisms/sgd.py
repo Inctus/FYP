@@ -238,14 +238,18 @@ class SGDMechanism(BaseMechanism):
         
         self.model.eval()
         predictions = []
+        true_labels = []
+        protected_attrs = []
         
         with torch.no_grad():
-            for batch_X, _ in test_loader:
+            for batch_X, true_labels, protected_attrs in test_loader:
                 batch_X = batch_X.to(device)
                 _, outputs = self.model(batch_X)
                 predictions.extend(outputs.squeeze().cpu().numpy().tolist())
-        
-        return predictions
+                true_labels.extend(true_labels.squeeze().cpu().numpy().tolist())
+                protected_attrs.extend(protected_attrs.squeeze().cpu().numpy().tolist())
+
+        return predictions, true_labels, protected_attrs
 
     def save(self, path: str):
         """
