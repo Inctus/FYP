@@ -46,7 +46,7 @@ class AGTBCMLP(nn.Sequential):
         Returns:
             MLPHyperparameters: Suggested hyperparameters for the MLP model.
         """
-        mlp_layer_0 = trial.suggest_categorical("mlp_layer_0", [32, 128, 256])
-        mlp_layer_1 = trial.suggest_categorical("mlp_layer_1", [16, 32, 128])
+        mlp_layer_0 = trial.suggest_categorical("mlp_layer_0", [32, 64, 128])
+        mlp_layer_1 = trial.suggest_categorical("mlp_layer_1", [32, 64, 128, 256])
         
         return AGTBCMLPHyperparameters(mlp_layers=[mlp_layer_0, mlp_layer_1])
