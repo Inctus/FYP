@@ -1,0 +1,3 @@
+from experiment.fairness_eval import get_fairness_results
+
+get_fairness_results("acs_income_dataset/acs_income_agt.json")

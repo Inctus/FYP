@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import abstract_gradient_training as agt
 import optuna
 from mechanisms.mechanism import BaseHyperparameters, DPPredictionMechanism, TrainingResults
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, RandomSampler
 
 from datasets.dataset import BaseDataset
 from util.privacy import PrivacyBudget
@@ -92,8 +92,54 @@ class AGTMechanism(DPPredictionMechanism):
             hyperparameters=hyperparameters,
         )
 
-    def predict(self, device: str, privacy_budget: PrivacyBudget):
-        raise NotImplementedError("AGT prediction not yet implemented.")
+    def predict(self, n_queries: int, privacy_budget: PrivacyBudget, device: str):
+        """
+        Predicts using the AGT mechanism. It repeatedly queries n_queries from the dataset
+        using the entire privacy budget. This is to create enough data to predict population
+        statistics from the sample size n_queries.
+        Args:
+            n_queries (int): Number of queries to make.
+            privacy_budget (PrivacyBudget): The privacy budget to use for the queries.
+            device (str): The device to run the predictions on (e.g., 'cpu' or 'cuda').
+        Returns:
+            A list of predictions for the n_queries samples.
+        """
+        _, _, test_dataset = self.dataset.to_torch(make_float64=True)
+        len_test = len(test_dataset)
+        if n_queries > len_test:
+            raise ValueError(f"n_queries ({n_queries}) cannot be greater than the number of samples in the test dataset ({len_test}).")
+
+        make_reproducible()
+
+        # Sample n_queries points with replacement to estimate population statistics
+        sampler = RandomSampler(test_dataset, replacement=True, num_samples=1000 * n_queries)
+        dataloader = DataLoader(test_dataset, sampler=sampler, batch_size=n_queries)
+
+        model = self.bounded_model_dict[0]
+        prediction_list = []
+
+        # Run inference on each sampled point
+        for features, labels, protected_attributes in dataloader:
+
+            features = features.to(device)
+
+            noise_level = agt.privacy_utils.get_calibrated_noise_level(
+                features, self.bounded_model_dict, privacy_budget.epsilon, privacy_budget.delta, noise_type="laplace"
+            )
+            pred = agt.privacy_utils.noisy_predictions(
+                model, features, labels, noise_level=noise_level, noise_type="laplace"
+            )
+
+            results = (
+                pred.squeeze().cpu().numpy().tolist(),
+                labels.squeeze().cpu().numpy().tolist(),
+                protected_attributes.squeeze().cpu().numpy().tolist()
+            )
+
+            # Convert tensor to Python scalar if needed
+            prediction_list.append(results)
+
+        return prediction_list
 
     def save(self, path: str):
         """

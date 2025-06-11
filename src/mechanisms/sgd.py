@@ -234,7 +234,7 @@ class SGDMechanism(BaseMechanism):
             List of prediction probabilities.
         """
         _, _, test_dataset = self.dataset.to_torch()
-        test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+        test_loader = DataLoader(test_dataset, batch_size=256, shuffle=False)
         
         self.model.eval()
         predictions = []
@@ -242,12 +242,12 @@ class SGDMechanism(BaseMechanism):
         protected_attrs = []
         
         with torch.no_grad():
-            for batch_X, true_labels, protected_attrs in test_loader:
+            for batch_X, t, p in test_loader:
                 batch_X = batch_X.to(device)
                 _, outputs = self.model(batch_X)
                 predictions.extend(outputs.squeeze().cpu().numpy().tolist())
-                true_labels.extend(true_labels.squeeze().cpu().numpy().tolist())
-                protected_attrs.extend(protected_attrs.squeeze().cpu().numpy().tolist())
+                true_labels.extend(t.squeeze().cpu().numpy().tolist())
+                protected_attrs.extend(p.squeeze().cpu().numpy().tolist())
 
         return predictions, true_labels, protected_attrs
 
