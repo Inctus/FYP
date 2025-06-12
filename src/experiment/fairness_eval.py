@@ -329,18 +329,16 @@ def get_fairness_results(hyperparam_path: str) -> HyperparameterResults:
 
     if results.mechanism_name == "agt":
         queries_numbers = [5, 10, 50, 100, 200, 500, 1000]
-        eps_budgets = [0.5, 1.0, 2.0, 4.0, 10.0]
+        eps_budgets = [10000.0, 5000.0, 2000.0, 1000.0, 500.0]
 
         outputs = {}
         
         for n_queries, eps_budget in product(queries_numbers, eps_budgets):
-            slack_ratio = 1/n_queries
             per_query_budget = split_privacy_budget(
                 PrivacyBudget(epsilon=eps_budget, delta=delta),
                 n_queries,
-                slack_ratio=slack_ratio,
+                slack_ratio=0.0000000001
             )
-            print(f"Using slack_ratio={slack_ratio}")
             # per_query_budget = PrivacyBudget(epsilon=eps_budget, delta=delta)
             print(f"Evaluating for n_query={n_queries}, eps_budget={eps_budget}, per query budget {per_query_budget}")
             dem_parity_list = []
@@ -418,7 +416,7 @@ def get_fairness_results(hyperparam_path: str) -> HyperparameterResults:
               f"\nEqualised Odds: {outputs['equalised_odds']}"
               f"\nAccuracy: {outputs['accuracy']}")
 
-    save_path = RESULT_BASE_FOLDER / hyperparam_path
+    save_path = RESULT_BASE_FOLDER / hyperparam_path.replace(".json", "_high_eps.json")
     save_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Write to json file
