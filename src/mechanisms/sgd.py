@@ -245,6 +245,7 @@ class SGDMechanism(BaseMechanism):
             for batch_X, t, p in test_loader:
                 batch_X = batch_X.to(device)
                 _, outputs = self.model(batch_X)
+                outputs = (outputs > 0.5).float()
                 predictions.extend(outputs.squeeze().cpu().numpy().tolist())
                 true_labels.extend(t.squeeze().cpu().numpy().tolist())
                 protected_attrs.extend(p.squeeze().cpu().numpy().tolist())

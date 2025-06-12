@@ -4,6 +4,9 @@ import abstract_gradient_training as agt
 import optuna
 from mechanisms.mechanism import BaseHyperparameters, DPPredictionMechanism, TrainingResults
 from torch.utils.data import DataLoader, RandomSampler
+import random
+from torch.utils.data import Sampler
+import torch
 
 from datasets.dataset import BaseDataset
 from util.privacy import PrivacyBudget
@@ -26,6 +29,73 @@ class AGTHyperparameters(BaseHyperparameters):
     lr_min: float
     lr_decay: float
     momentum: float
+
+# Custom sampler ensuring at least one positive and one negative from each group per batch
+class MinGroupBatchSampler(Sampler):
+    def __init__(self, group0, group1, all_inds, batch_size, num_batches, labels):
+        self.group0 = group0
+        self.group1 = group1
+        self.all_inds = all_inds
+        self.batch_size = batch_size
+        self.num_batches = num_batches
+        self.labels = labels
+        
+        # Split indices by both group and label
+        self.group0_pos = [i for i in group0 if labels[i] == 1]
+        self.group0_neg = [i for i in group0 if labels[i] == 0]
+        self.group1_pos = [i for i in group1 if labels[i] == 1]
+        self.group1_neg = [i for i in group1 if labels[i] == 0]
+        
+        # Validation for edge cases
+        if len(group0) == 0:
+            raise ValueError("Group 0 must have at least one sample")
+        if len(group1) == 0:
+            raise ValueError("Group 1 must have at least one sample")
+        if batch_size < 4:
+            raise ValueError("Batch size must be at least 4 to guarantee one positive and one negative from each group")
+        
+        # Check for equalized odds requirements
+        if len(self.group0_pos) == 0:
+            raise ValueError("Group 0 must have at least one positive sample (label=1) for equalized odds calculation")
+        if len(self.group0_neg) == 0:
+            raise ValueError("Group 0 must have at least one negative sample (label=0) for equalized odds calculation")
+        if len(self.group1_pos) == 0:
+            raise ValueError("Group 1 must have at least one positive sample (label=1) for equalized odds calculation")
+        if len(self.group1_neg) == 0:
+            raise ValueError("Group 1 must have at least one negative sample (label=0) for equalized odds calculation")
+    
+    def __iter__(self):
+        for _ in range(self.num_batches):
+            # Guarantee one positive and one negative from each group (4 samples minimum)
+            idx_g0_pos = random.choice(self.group0_pos)
+            idx_g0_neg = random.choice(self.group0_neg)
+            idx_g1_pos = random.choice(self.group1_pos)
+            idx_g1_neg = random.choice(self.group1_neg)
+            
+            batch = [idx_g0_pos, idx_g0_neg, idx_g1_pos, idx_g1_neg]
+            
+            # Fill remaining slots, avoiding duplicates within this batch
+            available_indices = [i for i in self.all_inds if i not in batch]
+            
+            remaining_slots = self.batch_size - 4
+            if remaining_slots > 0:
+                if len(available_indices) >= remaining_slots:
+                    # Sample without replacement from remaining indices
+                    rest = random.sample(available_indices, remaining_slots)
+                    batch.extend(rest)
+                else:
+                    # Edge case: not enough unique indices left
+                    # This shouldn't happen if batch_size <= len(all_inds), but handle gracefully
+                    rest = available_indices + random.choices(
+                        self.all_inds, k=remaining_slots - len(available_indices)
+                    )
+                    batch.extend(rest)
+            
+            random.shuffle(batch)
+            yield batch
+    
+    def __len__(self):
+        return self.num_batches
 
 
 class AGTMechanism(DPPredictionMechanism):
@@ -108,12 +178,34 @@ class AGTMechanism(DPPredictionMechanism):
         len_test = len(test_dataset)
         if n_queries > len_test:
             raise ValueError(f"n_queries ({n_queries}) cannot be greater than the number of samples in the test dataset ({len_test}).")
+        
+        # Check minimum batch size for equalized odds
+        if n_queries < 4:
+            raise ValueError("n_queries must be at least 4 to guarantee samples from both groups and both labels for equalized odds calculation")
 
         make_reproducible()
 
-        # Sample n_queries points with replacement to estimate population statistics
-        sampler = RandomSampler(test_dataset, replacement=True, num_samples=1000 * n_queries)
-        dataloader = DataLoader(test_dataset, sampler=sampler, batch_size=n_queries)
+        # Build lists of protected attribute values and labels
+        protected_list = []
+        labels_list = []
+        for _, label, prot in test_dataset:
+            val = prot.item() if isinstance(prot, torch.Tensor) and prot.numel()==1 else prot
+            label_val = label.item() if isinstance(label, torch.Tensor) and label.numel()==1 else label
+            protected_list.append(val)
+            labels_list.append(label_val)
+        
+        # Split indices by attribute value
+        group0_indices = [i for i, v in enumerate(protected_list) if v == 0]
+        group1_indices = [i for i, v in enumerate(protected_list) if v == 1]
+        all_indices = list(range(len_test))
+        num_batches = 1000
+
+        batch_sampler = MinGroupBatchSampler(
+            group0_indices, group1_indices, all_indices, 
+            n_queries, num_batches, labels_list
+        )
+        
+        dataloader = DataLoader(test_dataset, batch_sampler=batch_sampler)
 
         model = self.bounded_model_dict[0]
         prediction_list = []

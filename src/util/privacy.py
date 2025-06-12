@@ -78,26 +78,38 @@ def total(spent_budget, slack):
         return PrivacyBudget(min(total_epsilon_naive, total_epsilon_drv, total_epsilon_kov), total_delta)
 
 
-def split_privacy_budget(privacy_budget: PrivacyBudget, k=1):
-        delta = 1 - (1 - privacy_budget.delta) ** (1 / k)
-        # delta = 1 - np.exp((np.log(1 - self.delta) - np.log(1 - spent_delta)) / k)
+def split_privacy_budget(
+    privacy_budget: PrivacyBudget,
+    k: int = 1,
+    *,                       # keyword-only
+    slack_ratio: float = 0.05
+) -> PrivacyBudget:
+    """
+    Evenly splits an (ε, δ) budget across *k* compositions, reserving
+    `slack_ratio·δ` for the “slack” term used in the advanced-composition
+    theorem (Dwork & Roth, 2014).
 
-        lower = 0
-        upper = privacy_budget.epsilon
-        old_interval_size = (upper - lower) * 2
+    Returns
+    -------
+    PrivacyBudget
+        (ε_i, δ_i) that can be used once; k copies compose to ≤
+        (privacy_budget.epsilon, privacy_budget.delta).
+    """
+    if not (0 < slack_ratio < 1):
+        raise ValueError("slack_ratio must be in (0, 1).")
 
-        while old_interval_size > upper - lower:
-            old_interval_size = upper - lower
-            mid = (upper + lower) / 2
+    slack   = privacy_budget.delta * slack_ratio      # δ′
+    delta_i = (privacy_budget.delta - slack) / k      # per-step δ
 
-            spent_budget = [(mid, 0)] * k
-            cost = total(spent_budget=spent_budget, slack=privacy_budget.delta/2)
+    # ---- binary-search ε_i --------------------------------------------------
+    lower, upper, tol = 0.0, privacy_budget.epsilon, 1e-12
+    while upper - lower > tol:
+        mid  = (upper + lower) / 2
+        cost = total([(mid, delta_i)] * k, slack=slack)
+        if cost.epsilon > privacy_budget.epsilon:
+            upper = mid
+        else:
+            lower = mid
 
-            if cost.epsilon >= privacy_budget.epsilon:
-                upper = mid
-            else:
-                lower = mid
-
-        epsilon = (upper + lower) / 2
-
-        return PrivacyBudget(epsilon, delta)
+    eps_i = (upper + lower) / 2
+    return PrivacyBudget(eps_i, delta_i)

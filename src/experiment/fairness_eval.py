@@ -121,7 +121,6 @@ HYPERPARAM_RESULTS = {
 def demographic_parity(
     y_pred: np.ndarray,
     sensitive_attribute: np.ndarray,
-    threshold: Optional[float] = 0.5
 ) -> Optional[float]:
     """
     Calculates demographic parity: the absolute difference in positive prediction rate
@@ -130,12 +129,9 @@ def demographic_parity(
     Args:
         y_pred: 1D array of predicted probabilities or binary class predictions (0/1).
         sensitive_attribute: 1D array of binary values (0 or 1) indicating group membership.
-        threshold:
-            - float: threshold to binarize probabilities (y_pred > threshold).
-            - None: y_pred is assumed already 0 or 1.
     
     Returns:
-        The percentage difference in positive rate (0–100), or None if one group is empty.
+        The percentage difference in positive rate (0-100), or None if one group is empty.
     """
     if y_pred.shape != sensitive_attribute.shape:
         raise ValueError("`y_pred` and `sensitive_attribute` must have the same shape.")
@@ -143,11 +139,7 @@ def demographic_parity(
     if not np.all(np.isin(sensitive_attribute, [0, 1])):
         raise ValueError("sensitive_attribute must contain only 0 and 1 values")
     
-    # Binarize if needed
-    if threshold is None:
-        y_hat = (y_pred == 1).astype(int)  # More explicit than astype(bool)
-    else:
-        y_hat = (y_pred > threshold).astype(int)
+    y_hat = (y_pred == 1).astype(int)  # More explicit than astype(bool)
     
     # Masks for each group
     mask1 = sensitive_attribute == 1
@@ -155,7 +147,9 @@ def demographic_parity(
     
     # If one group is empty, we can't compute parity
     if not mask1.any() or not mask0.any():
-        return None
+        raise ValueError(
+            "Both groups defined by the sensitive attribute must have at least one member."
+        )
     
     rate1 = y_hat[mask1].mean()
     rate0 = y_hat[mask0].mean()
@@ -167,8 +161,7 @@ def demographic_parity(
 def equalised_odds(
     y_pred: np.ndarray,
     y_gt: np.ndarray,
-    sensitive_attribute: np.ndarray,
-    threshold: Optional[float] = 0.5
+    sensitive_attribute: np.ndarray
 ) -> Optional[float]:
     """
     Calculates the equalized odds metric: the sum of absolute differences in
@@ -179,9 +172,6 @@ def equalised_odds(
         y_pred: 1D array of predicted probabilities OR binary class predictions (0/1).
         y_gt: 1D array of true labels (0 or 1).
         sensitive_attribute: 1D array of sensitive attribute values (0 or 1).
-        threshold:
-            - If float, y_pred is treated as probabilities and thresholded at >threshold.
-            - If None, y_pred is assumed already to be 0/1 class labels.
     
     Returns:
         The percentage difference in TPR + FPR between groups (a float in [0, 200]),
@@ -199,28 +189,22 @@ def equalised_odds(
     mask1 = sensitive_attribute == 1
     mask0 = sensitive_attribute == 0
     if not mask1.any() or not mask0.any():
-        return None
+        raise ValueError(
+            "Both groups defined by the sensitive attribute must have at least one member."
+        )
     
-    # Binarize predictions if we're given probabilities
-    if threshold is None:
-        y_hat = (y_pred == 1).astype(int)  # More explicit conversion
-    else:
-        y_hat = (y_pred > threshold).astype(int)
+    y_hat = (y_pred == 1).astype(int)
     
     # Helper to compute a rate-difference for a given ground-truth mask
     def rate_diff(gt_mask: np.ndarray) -> Optional[float]:
         if not gt_mask.any():  # No samples with this ground truth label
-            return None
+            raise ValueError(
+                "Ground truth mask must have at least one member for both groups."
+            )
             
         sa = sensitive_attribute[gt_mask]
         preds = y_hat[gt_mask]
-        
-        # Both groups should be present (already checked above, but being defensive)
-        sa1_present = np.sum(sa == 1) > 0
-        sa0_present = np.sum(sa == 0) > 0
-        if not (sa1_present and sa0_present):
-            return None
-        
+
         p1 = preds[sa == 1].mean()
         p0 = preds[sa == 0].mean()
         return abs(p1 - p0)
@@ -344,20 +328,26 @@ def get_fairness_results(hyperparam_path: str) -> HyperparameterResults:
     print("Training complete.")
 
     if results.mechanism_name == "agt":
-        queries_numbers = [10, 50, 100, 200, 500, 1000]
+        queries_numbers = [5, 10, 50, 100, 200, 500, 1000]
         eps_budgets = [0.5, 1.0, 2.0, 4.0, 10.0]
 
         outputs = {}
         
         for n_queries, eps_budget in product(queries_numbers, eps_budgets):
+            slack_ratio = 1/n_queries
             per_query_budget = split_privacy_budget(
-                PrivacyBudget(epsilon=eps_budget, delta=delta), n_queries
+                PrivacyBudget(epsilon=eps_budget, delta=delta),
+                n_queries,
+                slack_ratio=slack_ratio,
             )
+            print(f"Using slack_ratio={slack_ratio}")
+            # per_query_budget = PrivacyBudget(epsilon=eps_budget, delta=delta)
             print(f"Evaluating for n_query={n_queries}, eps_budget={eps_budget}, per query budget {per_query_budget}")
             dem_parity_list = []
             equal_odds_list = []
             accuracy_list = []
 
+            skipped_predictions = 0
             predictions = mechanism.predict(n_queries, per_query_budget, DEVICE)
             for prediction in predictions:
                 preds, true_labels, prot_attrs = prediction
@@ -374,7 +364,10 @@ def get_fairness_results(hyperparam_path: str) -> HyperparameterResults:
                     dem_parity_list.append(demo_parity)
                     equal_odds_list.append(equal_odds)
                     accuracy_list.append(accuracy)
+                else:
+                    skipped_predictions += 1
 
+            print(f"Skipped {skipped_predictions}/{len(predictions)} predictions due to empty groups.")
             dem_parity_mean = float(np.mean(dem_parity_list))
             dem_parity_std = float(np.std(dem_parity_list))
             equal_odds_mean = float(np.mean(equal_odds_list))
@@ -405,6 +398,9 @@ def get_fairness_results(hyperparam_path: str) -> HyperparameterResults:
     elif results.mechanism_name == "dpsgd" or results.mechanism_name == "sgd":
         predictions, true_labels, protected_attrs = mechanism.predict(DEVICE)
 
+        print(len(predictions), len(true_labels), len(protected_attrs))
+        print(predictions[:5], true_labels[:5], protected_attrs[:5])
+
         outputs = {}
 
         # convert to numpy
@@ -416,9 +412,11 @@ def get_fairness_results(hyperparam_path: str) -> HyperparameterResults:
 
         outputs["demographic_parity"] = demographic_parity(predictions, protected_attrs)
         outputs["equalised_odds"] = equalised_odds(predictions, true_labels, protected_attrs)
+        outputs["accuracy"] = (predictions == true_labels).mean()
 
         print(f"Demographic Parity: {outputs['demographic_parity']}"
-              f"\nEqualised Odds: {outputs['equalised_odds']}")
+              f"\nEqualised Odds: {outputs['equalised_odds']}"
+              f"\nAccuracy: {outputs['accuracy']}")
 
     save_path = RESULT_BASE_FOLDER / hyperparam_path
     save_path.parent.mkdir(parents=True, exist_ok=True)

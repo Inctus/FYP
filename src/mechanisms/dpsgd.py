@@ -363,6 +363,7 @@ class DPSGDMechanism(DPLearningMechanism):
             for batch_X, l, p in test_loader:
                 batch_X = batch_X.to(device)
                 _, outputs = self.model(batch_X)
+                outputs = (outputs > 0.5).float()
                 predictions.extend(outputs.squeeze().cpu().numpy().tolist())
                 true_labels.extend(l.squeeze().cpu().numpy().tolist())
                 protected_attrs.extend(p.squeeze().cpu().numpy().tolist())
